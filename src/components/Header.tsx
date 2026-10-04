@@ -121,6 +121,7 @@ export const Header: React.FC<HeaderProps> = ({
             className={`view-tab ${currentView === 'sessions' ? 'active' : ''}`}
             onClick={() => onViewChange('sessions')}
             title="Field Sessions (Import a screen recording and sample frames)"
+            aria-label="Field Sessions"
           >
             <Video size={15} />
             <span>Sessions</span>
@@ -138,6 +139,7 @@ export const Header: React.FC<HeaderProps> = ({
               className={`view-tab ${currentView === 'gallery' ? 'active' : ''}`}
               onClick={() => onViewChange('gallery')}
               title="Gallery View (All Candidate Frames)"
+              aria-label="Gallery"
             >
               <LayoutGrid size={15} />
               <span>Gallery</span>
@@ -146,6 +148,7 @@ export const Header: React.FC<HeaderProps> = ({
               className={`view-tab ${currentView === 'cockpit' ? 'active' : ''}`}
               onClick={() => onViewChange('cockpit')}
               title="Annotation Cockpit (Ground Truth Transcription)"
+              aria-label="Annotate"
             >
               <Edit3 size={15} />
               <span>Annotate</span>
@@ -154,6 +157,7 @@ export const Header: React.FC<HeaderProps> = ({
               className={`view-tab ${currentView === 'dedup' ? 'active' : ''}`}
               onClick={() => onViewChange('dedup')}
               title="Near-Duplicate Review (Perceptual Deduplication)"
+              aria-label="Deduplicate"
             >
               <Fingerprint size={15} />
               <span>Deduplicate</span>
@@ -170,6 +174,7 @@ export const Header: React.FC<HeaderProps> = ({
           className="btn btn-secondary btn-sm"
           onClick={onTriggerUpload}
           title="Import a screen recording (field session)"
+          aria-label="Import Session"
         >
           <Video size={14} />
           <span>Import Session</span>
@@ -179,6 +184,7 @@ export const Header: React.FC<HeaderProps> = ({
           className="btn btn-ghost btn-icon btn-sm"
           onClick={onOpenDatasetSettings}
           title="Dataset Configuration & Goals"
+          aria-label="Dataset Configuration & Goals"
         >
           <SlidersHorizontal size={16} />
         </button>
@@ -189,6 +195,7 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             className={`btn btn-sm ${exportBlockers > 0 ? 'btn-secondary' : 'btn-accent-emerald'}`}
             onClick={onOpenExport}
+            aria-label="Export Corpus"
             title={
               exportBlockers > 0
                 ? `Export blocked by ${exportBlockers} issue(s). Open to review.`
@@ -208,6 +215,7 @@ export const Header: React.FC<HeaderProps> = ({
             className="btn btn-primary btn-sm"
             onClick={onLoadSampleBatch}
             title="Load Pre-configured Fieldwork Mock Frames"
+            aria-label="Load Sample Batch"
           >
             <Sparkles size={14} />
             <span>Load Sample Batch</span>
@@ -218,6 +226,7 @@ export const Header: React.FC<HeaderProps> = ({
           className="btn btn-ghost btn-icon btn-sm"
           onClick={onOpenShortcuts}
           title="Keyboard Shortcuts (?)"
+          aria-label="Keyboard Shortcuts"
         >
           <Keyboard size={16} />
         </button>

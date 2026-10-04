@@ -8,6 +8,13 @@ build/
 
 # local verification output
 node_modules/.verify/
+node_modules/.playwright/
+test-results/
+playwright-report/
+
+# visual regression output — regenerate with `npm run e2e`.
+# Commit these if you want a visual baseline to diff against; otherwise ignore.
+screenshots/
 
 # logs
 *.log

@@ -15,6 +15,9 @@
     "verify:slice6": "esbuild src/test/verifySlice6.ts --bundle --platform=node --format=cjs --outfile=node_modules/.verify/s6.cjs --log-level=error && node node_modules/.verify/s6.cjs",
     "verify:slice7": "esbuild src/test/verifySlice7.ts --bundle --platform=node --format=cjs --outfile=node_modules/.verify/s7.cjs --log-level=error && node node_modules/.verify/s7.cjs",
     "verify:slice7-ui": "esbuild src/test/verifySlice7Ui.tsx --bundle --platform=node --format=cjs --jsx=automatic --outfile=node_modules/.verify/s7ui.cjs --log-level=error && node node_modules/.verify/s7ui.cjs",
+    "e2e": "npm run build && playwright test",
+    "e2e:install": "playwright install chromium",
+    "e2e:ui": "playwright test --ui",
     "verify": "npm run verify:slice1 && npm run verify:slice2 && npm run verify:slice3 && npm run verify:slice4 && npm run verify:slice5 && npm run verify:slice6 && npm run verify:slice7 && npm run verify:slice7-ui"
   },
   "dependencies": {

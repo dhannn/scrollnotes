@@ -170,8 +170,11 @@ export const DatasetSetupWizard: React.FC<DatasetSetupWizardProps> = ({
                 uploaded, and every sample keeps a link back to the frame it came from.
               </p>
               <div className="form-group">
-                <label className="form-label"><span>Dataset name</span></label>
+                <label className="form-label" htmlFor="setup-name">
+                  <span>Dataset name</span>
+                </label>
                 <input
+                  id="setup-name"
                   className="form-input"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
@@ -180,8 +183,11 @@ export const DatasetSetupWizard: React.FC<DatasetSetupWizardProps> = ({
                 />
               </div>
               <div className="form-group">
-                <label className="form-label"><span>Version</span></label>
+                <label className="form-label" htmlFor="setup-version">
+                  <span>Version</span>
+                </label>
                 <input
+                  id="setup-version"
                   className="form-input"
                   value={version}
                   onChange={(e) => setVersion(e.target.value)}
@@ -205,9 +211,13 @@ export const DatasetSetupWizard: React.FC<DatasetSetupWizardProps> = ({
             <div className="setup-pane">
               <h4 className="setup-pane-title">Scale and identity</h4>
               <div className="form-group">
-                <label className="form-label"><Target size={13} /><span>Intended corpus size</span></label>
+                <label className="form-label" htmlFor="setup-target-min">
+                  <Target size={13} />
+                  <span>Intended corpus size</span>
+                </label>
                 <div className="setup-range-row">
                   <input
+                    id="setup-target-min"
                     type="number"
                     className="form-input"
                     value={targetMin}
@@ -234,8 +244,12 @@ export const DatasetSetupWizard: React.FC<DatasetSetupWizardProps> = ({
                 </span>
               </div>
               <div className="form-group">
-                <label className="form-label"><Tag size={13} /><span>Sample ID prefix</span></label>
+                <label className="form-label" htmlFor="setup-prefix">
+                  <Tag size={13} />
+                  <span>Sample ID prefix</span>
+                </label>
                 <input
+                  id="setup-prefix"
                   className="form-input"
                   value={prefix}
                   onChange={(e) => setPrefix(e.target.value)}

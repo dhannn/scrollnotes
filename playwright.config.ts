@@ -25,17 +25,52 @@ export default defineConfig({
     reducedMotion: 'reduce',
   },
   projects: [
+    // Chromium for ALL projects: the iPhone/iPad device presets default to WebKit,
+    // which would require a second browser download. The viewport, device scale and
+    // `isMobile`/`hasTouch` flags are what drive the responsive CSS, not the engine.
     {
       name: 'mobile-390',
-      use: { ...devices['iPhone 13'], isMobile: true, hasTouch: true },
+      use: {
+        ...devices['Desktop Chrome'],
+        browserName: 'chromium',
+        viewport: { width: 390, height: 844 },
+        deviceScaleFactor: 3,
+        isMobile: true,
+        hasTouch: true,
+      },
     },
     {
       name: 'tablet-768',
-      use: { ...devices['iPad Mini'], isMobile: true, hasTouch: true },
+      use: {
+        ...devices['Desktop Chrome'],
+        browserName: 'chromium',
+        viewport: { width: 768, height: 1024 },
+        deviceScaleFactor: 2,
+        isMobile: true,
+        hasTouch: true,
+      },
+    },
+    // Landscape phone: the stacked cockpit has almost no vertical room here, which
+    // is a layout nobody had tested.
+    {
+      name: 'landscape-844',
+      use: {
+        ...devices['Desktop Chrome'],
+        browserName: 'chromium',
+        viewport: { width: 844, height: 390 },
+        deviceScaleFactor: 3,
+        isMobile: true,
+        hasTouch: true,
+      },
     },
     {
       name: 'desktop-1280',
-      use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
+      use: {
+        ...devices['Desktop Chrome'],
+        browserName: 'chromium',
+        viewport: { width: 1280, height: 800 },
+        deviceScaleFactor: 1,
+      },
     },
   ],
   webServer: {

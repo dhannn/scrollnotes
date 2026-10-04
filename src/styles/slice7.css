@@ -400,16 +400,28 @@
      to reach it, so the whole pane model is inverted here: the CONTAINER scrolls,
      and both panes size to their content. */
   .cockpit-container {
-    display: block;
-    height: auto;
+    display: flex;
+    flex-direction: column;
+    /* It must be a REAL scrollport: `height:auto` in a flex column made it grow
+       to its content, so `scrollHeight === clientHeight` and it could never
+       scroll. The form was then only reachable because `.main-view-area`
+       (overflow:hidden) was scrolling underneath, which is not touch-scrollable
+       and broke the sticky frame — measured by e2e/probe.spec.ts.
+
+       Height comes from `flex:1` on the flex-column parent, NOT `height:100%`:
+       a percentage height ignores the sibling notice above it and overflows. */
+    flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   .visual-stage,
   .ground-truth-panel {
     height: auto;
     overflow: visible;
+    flex: none;
   }
 
   /* The frame stays visible above the scrolling form, so the transcription loop
@@ -485,6 +497,30 @@
 
 /* --- No horizontal page scroll at any width ------------------------------- */
 @media (max-width: 860px) {
+  /* A flex child defaults to `min-height:auto`, which means it refuses to shrink
+     below its content. `.main-view-area` is `flex:1` inside `.app-container`, so
+     the tall cockpit content pushed it 28px past the viewport and the sticky
+     action bar — which is anchored to its bottom — was clipped off-screen on
+     tablet. `min-height:0` is what actually lets it shrink and scroll. */
+  .main-view-area {
+    min-height: 0;
+    /* The cockpit notice is a SIBLING of the cockpit inside this element. With
+       `.cockpit-container { height:100% }`, the notice's height was added on top
+       of a full-height child, pushing the cockpit — and therefore its bottom-
+       anchored sticky action bar — 28px past the viewport, clipping the bar off-
+       screen on tablet. Making the parent a flex column lets the cockpit claim
+       exactly the space the notice leaves (`flex:1`, `min-height:0`).
+
+       `height:100%` on the child is then no longer correct: as a flex item it
+       sizes from `flex:1` instead, so no absolute height is needed. */
+    display: flex;
+    flex-direction: column;
+  }
+
+  .cockpit-mobile-notice {
+    flex: none;
+  }
+
   /* `100vw` includes the scrollbar gutter, which forces the whole page wider than
      the viewport on desktop-emulated mobile. `width:100%` plus a clip is safer. */
   .app-container {
@@ -513,6 +549,7 @@
   .view-tab,
   .filter-btn,
   .btn,
+  .lifecycle-bar-cta,
   .touch-action-bar .btn {
     min-height: 44px;
   }
@@ -525,11 +562,6 @@
 
   .platform-pill {
     padding: 0.6rem 0.35rem;
-  }
-
-  /* The touch action bar is the shortcut registry made tappable (§10.5). */
-  .touch-action-bar {
-    display: flex;
   }
 }
 
@@ -607,11 +639,26 @@
     grid-template-columns: 1fr;
   }
 
-  /* Progress is the compact answer to "where am I?" — it must survive (§15). */
+  /* Progress is the compact answer to "where am I?" — it must survive (§15).
+     The bar stacks rather than sharing a row: `.lifecycle-bar-note` is
+     `white-space: nowrap`, so left on one line it overflows and collides with
+     the CTA (seen in screenshots/mobile-390-gallery.png). */
   .lifecycle-bar {
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
     gap: 0.4rem;
-    padding: 0.4rem 0.75rem;
+    padding: 0.45rem 0.75rem;
+  }
+
+  .lifecycle-bar-left {
+    flex-wrap: wrap;
+    gap: 0.4rem 0.6rem;
+  }
+
+  .lifecycle-bar-note {
+    order: 4;
+    flex-basis: 100%;
+    white-space: normal;
   }
 
   .lifecycle-bar-track {
@@ -621,7 +668,9 @@
   }
 
   .lifecycle-bar-cta {
-    min-height: 40px;
+    min-height: 44px;
+    width: 100%;
+    justify-content: center;
   }
 }
 
@@ -637,16 +686,40 @@
   position: sticky;
   bottom: 0;
   z-index: 6;
+  /* Never let the bar be squashed by a tall form — it is the primary action
+     surface on touch (§19). */
+  flex: none;
 }
 
 .touch-action-bar .btn {
   flex: 1;
   justify-content: center;
+  /* "Save & Next" wrapped onto two lines and clipped at the viewport edge on a
+     phone. Labels are short by design; never let them break. */
+  white-space: nowrap;
+  min-width: 0;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
 }
 
 .touch-action-bar .btn-save-next,
 .touch-action-bar .btn-primary {
   flex: 2;
+}
+
+/* The touch action bar is the shortcut registry made tappable (§10.5).
+
+   ORDER MATTERS: this override MUST come AFTER the `display: none` base rule
+   above. Both selectors have identical specificity (0,0,1,0), so the later
+   rule wins outright. The override previously sat ~120 lines EARLIER, where
+   the base rule silently re-hid the bar — the mobile action bar was dead code
+   on every touch device while the suite still passed, because the assertions
+   that would have caught it were querying `:visible` elements that were
+   correctly reported as zero. Verified by e2e/probe.spec.ts. */
+@media (pointer: coarse) {
+  .touch-action-bar {
+    display: flex;
+  }
 }
 
 /* Honest note that heavy transcription is a desktop task (§10.2). Hidden on
@@ -678,6 +751,281 @@
   .lifecycle-bar {
     padding-left: max(0.75rem, env(safe-area-inset-left));
     padding-right: max(0.75rem, env(safe-area-inset-right));
+  }
+}
+
+/* ============================================================================
+   SLICE 7 §10.8 — RECLAIMING THE MOBILE VIEWPORT
+
+   Screenshots of the populated cockpit showed the actual problem: on a 390x844
+   phone, the header + progress widget + lifecycle bar + mobile notice consumed
+   roughly 700px, leaving almost nothing for the frame and the form. The layout
+   was not broken — it was unusable, because the work itself was squeezed out.
+
+   On a phone the chrome must yield to the content. The rules below compress the
+   status layer rather than removing it: progress must survive AGENTS §15, but
+   it does not need a full-size widget plus an advisory sentence plus a CTA
+   button stacked vertically to say "you are 1 of 6".
+   ========================================================================== */
+
+@media (max-width: 620px) and (pointer: coarse) {
+  /* The dashboard progress widget duplicates the lifecycle bar's own progress
+     immediately below it. Two progress indicators in one screen is noise. */
+  .app-header .progress-widget {
+    display: none;
+  }
+
+  /* The advisory note is a full sentence of static prose. On a phone it is the
+     single least useful thing on screen; the compact count remains. */
+  .lifecycle-bar-note {
+    display: none;
+  }
+
+  /* Tighten the stacked lifecycle bar now that the note is gone. */
+  .lifecycle-bar {
+    gap: 0.3rem;
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  /* The CTA is the lifecycle bar's whole purpose; it keeps full width. */
+  .lifecycle-bar-cta {
+    min-height: 44px;
+  }
+
+  /* The mobile notice explains a limitation the researcher has already accepted
+     by choosing to work here. Two lines is the honest maximum. */
+  .cockpit-mobile-notice {
+    display: none !important;
+  }
+
+  /* Header rows: the nav tabs already scroll horizontally, so tighten rather
+     than wrap further. */
+  .app-header {
+    gap: 0.35rem;
+    padding-top: 0.4rem;
+    padding-bottom: 0.4rem;
+  }
+
+  .brand-section {
+    gap: 0.5rem;
+  }
+
+  /* Give the frame a little more of the recovered space. */
+  .visual-stage {
+    height: min(34vh, 300px);
+  }
+}
+
+/* The touch bar is the primary action surface on a phone (§19); give it a
+   little more presence than a secondary control. */
+@media (max-width: 620px) and (pointer: coarse) {
+  .touch-action-bar .btn span {
+    font-size: 0.85rem;
+  }
+
+  /* The sample badge is inline text sharing a row with six icon buttons, so the
+     browser had ~40px to lay it out in. It broke the ID mid-token ("ugc-" /
+     "000001") and collapsed "(1 of 6)" to one character per line, which made
+     the provenance unreadable — the one thing §21 requires to stay legible.
+     Let the badge shrink, forbid breaks inside it, and let the toolbar scroll
+     rather than crush its own text. */
+  .stage-sample-badge {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .stage-sample-badge strong {
+    white-space: nowrap;
+  }
+}
+
+/* Landscape phones are the tightest case: 390px of height against a wide
+   viewport. Keying the chrome budget off WIDTH alone misses them entirely —
+   an 844x390 landscape phone passes `max-width: 620px` while having almost no
+   vertical room, which is what collapsed the frame to a postage stamp. Height
+   is the constraint that actually matters here, so gate on it directly. */
+@media (max-height: 560px) and (pointer: coarse) {
+  /* Hide the second nav row's label row entirely; the icons alone are enough
+     when the alternative is annotating into a 40px-tall image. */
+  .app-header .progress-widget,
+  .lifecycle-bar-note,
+  .cockpit-mobile-notice {
+    display: none !important;
+  }
+
+  .app-header,
+  .lifecycle-bar {
+    gap: 0.3rem;
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
+  }
+
+  /* Give the frame a real share of a short viewport. 52vh of 390px is ~200px:
+     large enough to read the UGC, which is the entire point of the stage. */
+  .visual-stage {
+    height: 52vh;
+    min-height: 170px;
+  }
+}
+
+/* ============================================================================
+   SLICE 7 §10.7 — NATIVE MOBILE FEEL
+   The prior responsive work made the app *usable* on a phone: nothing clipped,
+   nothing overlapping, targets big enough to hit. That is not the same as
+   feeling native. These rules close the gap between "renders on mobile" and
+   "behaves like an app you already know".
+
+   All of it is additive and scoped to `(pointer: coarse)`, so the desktop
+   workstation is untouched (§36).
+
+   Each item here exists because its absence is a specific, recognisable
+   wrongness on a real device — not speculative polish.
+   ========================================================================== */
+
+@media (pointer: coarse) {
+  /* --- 1. Kill the grey tap flash, then provide our own press feedback ------- */
+  /* Mobile Safari/Chrome flash a translucent grey rectangle over every tappable
+     element. Suppressing it and adding a deliberate `:active` state gives a
+     press that actually looks intentional instead of broken. */
+  button,
+  .view-tab,
+  .platform-pill,
+  .flag-chip,
+  .meta-chip,
+  .filter-btn,
+  .encounter-card,
+  .lifecycle-bar-cta {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* A press must be VISIBLE within ~100ms or the tap feels dropped. Scale is
+     used rather than a colour change alone because it survives both themes. */
+  button:active:not(:disabled),
+  .view-tab:active,
+  .platform-pill:active,
+  .flag-chip:active,
+  .meta-chip:active,
+  .filter-btn:active,
+  .lifecycle-bar-cta:active {
+    transform: scale(0.96);
+    opacity: 0.85;
+  }
+
+  /* `transition` is scoped to the press only: hover transitions on touch
+     devices make a tap feel laggy by animating the *release*. */
+  button,
+  .view-tab,
+  .platform-pill,
+  .flag-chip,
+  .filter-btn {
+    transition: transform 90ms ease-out, opacity 90ms ease-out;
+  }
+
+  /* --- 2. Momentum scrolling ---------------------------------------------- */
+  /* Without this, scrolling a long form on iOS drags 1:1 with no inertia. It
+     is the single most "not-native" feeling in the cockpit on a phone. */
+  .cockpit-container,
+  .gallery-grid-scroll,
+  .form-scroll-area,
+  .dedup-container,
+  .main-view-area {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  /* `contain` stops a flick inside the form from triggering the browser's
+     pull-to-refresh and rubber-banding the whole document — the app scrolls
+     internally, so the page itself should never bounce (§35 local-first). */
+
+  /* --- 3. Inputs must not trigger iOS zoom-on-focus ------------------------- */
+  /* iOS Safari zooms the viewport when a focused input's font-size is under
+     16px, and the user then has to pinch back out. This is the classic
+     "why does my form feel broken on iPhone" defect. 16px is the threshold. */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  /* --- 4. The soft keyboard must not cover the field being edited ---------- */
+  /* Scrolls the focused control clear of the keyboard instead of leaving it
+     behind the on-screen keyboard. */
+  input,
+  textarea,
+  select {
+    scroll-margin-bottom: 6rem;
+  }
+
+  /* --- 5. Stop long-press selection on controls ---------------------------- */
+  /* Long-pressing a button on iOS raises the text callout and magnifier. On
+     chrome that is noise; on the action bar it reads as a glitch. */
+  button,
+  .view-tab,
+  .lifecycle-bar-cta,
+  .touch-action-bar {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* --- 6. No accidental zoom on double-tap --------------------------------- */
+  /* `touch-action: manipulation` removes the 300ms double-tap-zoom delay while
+     KEEPING deliberate pinch-zoom (accessibility must not be traded away). */
+  button,
+  .view-tab,
+  .platform-pill,
+  .flag-chip,
+  .filter-btn,
+  .lifecycle-bar-cta,
+  .encounter-card {
+    touch-action: manipulation;
+  }
+}
+
+/* --- Dynamic viewport units ------------------------------------------------ */
+/* `100vh` on mobile browsers includes the space behind the collapsing URL bar,
+   so the app is ~15% taller than the visible screen and the bottom of the form
+   (and the sticky touch bar) sits under the browser chrome. `dvh` tracks the
+   REAL viewport. Declared as an addition so browsers without `dvh` keep `vh`. */
+@supports (height: 100dvh) {
+  @media (max-width: 860px) {
+    .app-container {
+      height: 100dvh;
+    }
+
+    .modal-overlay,
+    .modal-dialog,
+    .setup-dialog {
+      max-height: 100dvh;
+      height: 100dvh;
+    }
+  }
+}
+
+/* --- Landscape phones: reclaim the vertical space --------------------------- */
+/* At 844x390 the stacked cockpit would leave almost nothing for the form, so
+   the sticky frame shrinks to a banner and the notice is dropped. */
+@media (max-height: 500px) and (pointer: coarse) {
+  .visual-stage {
+    height: min(30vh, 180px);
+  }
+
+  .cockpit-mobile-notice {
+    display: none !important;
+  }
+
+  /* The header and lifecycle bar together can exceed a landscape viewport. */
+  .app-header {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .lifecycle-bar {
+    padding-top: 0.3rem;
+    padding-bottom: 0.3rem;
   }
 }
 

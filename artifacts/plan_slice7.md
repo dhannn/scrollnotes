@@ -580,3 +580,53 @@ which is unavoidable and correct (§ nothing exists before it).
   assertions had been silently failing. Worth hardening.
 ---
 
+
+### 13.6 Mobile cockpit bugs found by screenshot review (not by assertions)
+
+The cockpit suite reported 20/20 green while the phone layout was visibly broken.
+Screenshots and a geometry probe showed the assertions were passing *vacuously*
+against elements that could not scroll and controls that were not rendered.
+
+- **The touch action bar never rendered on any touch device.** The
+  `display:flex` override for `(pointer: coarse)` sat ~120 lines *above* the base
+  `display:none` rule. Equal specificity, so the later rule won and the mobile
+  action bar was dead code. Fixed by moving the override after the base rule.
+- **The cockpit form could not be scrolled by touch at all.**
+  `.cockpit-container` had `height:auto` inside a flex column, so it grew to its
+  content and `scrollHeight === clientHeight`. The form was only reachable
+  because `.main-view-area` (`overflow:hidden`) was scrolling underneath, which
+  is not touch-scrollable - and it broke the sticky frame.
+- **The "sticky" frame was scrolled out of sight** (measured at `y:-276`). The
+  researcher had to scroll away from the image to transcribe it, the exact
+  context-switching AGENTS.md section 38 forbids.
+- **Tablet clipped the action bar 28px off-screen.** The cockpit notice is a
+  *sibling* of the cockpit inside `.main-view-area`; a percentage height on the
+  cockpit ignored it and overflowed. Fixed by making the parent a flex column so
+  the cockpit claims exactly the remaining space via `flex:1; min-height:0`.
+- **Chrome consumed ~70% of an 844px phone screen.** Header + progress widget +
+  lifecycle note + notice left almost nothing for the frame. Compressed on
+  coarse pointers; the chrome budget is now asserted at <45% of the viewport.
+- **The provenance badge was unreadable.** `(1 of 6)` collapsed to one character
+  per line and the sample ID split mid-token, because the badge shared a row
+  with six icon buttons. Section 21 requires provenance to stay legible.
+- **Landscape (844x390) hid the frame behind a width-based media query.** The
+  chrome-compression rule keyed off `max-width`, so a short-but-wide landscape
+  phone skipped it and the frame collapsed to a ~50px postage stamp. Now gated
+  on `max-height`.
+
+### 13.7 Test-harness lesson
+
+Every one of these was green first and wrong after inspection. The pattern was
+the same in all cases: an assertion passed because it measured *zero* elements
+or a *no-op* scroll. The cockpit test now asserts its own preconditions first -
+the touch bar must be visible, the scrollport must actually have overflow, the
+tap-target query must match more than three elements - so it can fail loudly
+instead of reporting green checks that proved nothing. Pixel review remains a
+required step; assertions alone did not catch any of the above.
+
+### 13.8 Known remaining limitations
+
+- Landscape phones still letterbox a portrait screenshot inside a wide, short
+  visual stage. Constrained by aspect ratio, not by the chrome budget.
+- Real iOS Safari, soft-keyboard behaviour, and physical devices remain untested;
+  all mobile evidence here comes from Chromium emulation.
