@@ -1,0 +1,211 @@
+/* ==========================================================================
+   SLICE 6 — CORPUS EXPORT
+   The pre-export checklist is the last thing between a researcher and a
+   reproducibility artifact, so it reads as a checklist: one row per check,
+   severity carried by colour AND by an explicit sentence.
+   ========================================================================== */
+
+.export-dialog {
+  max-width: 620px;
+}
+
+.export-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  max-height: 62vh;
+  overflow-y: auto;
+}
+
+/* --- Checklist ------------------------------------------------------------ */
+
+.export-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.export-check {
+  border-left: 2px solid var(--border-medium);
+  padding: 0.45rem 0.65rem;
+  background: var(--bg-surface);
+  border-radius: 0 3px 3px 0;
+}
+
+.export-check.pass {
+  border-left-color: var(--accent-emerald);
+}
+
+.export-check.warn {
+  border-left-color: var(--accent-amber);
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.export-check.fail {
+  border-left-color: var(--accent-rose);
+  background: rgba(244, 63, 94, 0.07);
+}
+
+.export-check-head {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.export-check-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-main);
+  font-family: var(--font-mono);
+}
+
+.export-check-detail {
+  margin: 0.15rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.export-check-ids {
+  margin: 0.25rem 0 0;
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+
+/* --- Format picker -------------------------------------------------------- */
+
+.export-format-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+  margin-top: 0.2rem;
+}
+
+.export-format {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.3rem;
+  font-size: 0.75rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.export-format:hover:not(:disabled) {
+  border-color: var(--border-medium);
+  color: var(--text-main);
+}
+
+.export-format.selected {
+  border-color: var(--border-focus);
+  color: var(--accent-sky);
+  background: var(--bg-surface-active);
+}
+
+.export-format:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Bundle preview ------------------------------------------------------- */
+
+.export-tree {
+  font-family: var(--font-mono);
+  font-size: 0.73rem;
+  background: var(--bg-core);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  padding: 0.6rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.export-tree-root {
+  color: var(--text-main);
+  padding-bottom: 0.3rem;
+  margin-bottom: 0.2rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.export-tree-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  color: var(--text-muted);
+  padding-left: 0.85rem;
+}
+
+.export-tree-count,
+.export-tree-note {
+  color: var(--text-dim);
+  font-size: 0.68rem;
+  white-space: nowrap;
+}
+
+/* --- Progress / errors ---------------------------------------------------- */
+
+.export-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.export-progress-track {
+  flex: 1;
+  height: 3px;
+  background: var(--bg-surface-active);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.export-progress-fill {
+  height: 100%;
+  width: 35%;
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));
+}
+
+.export-progress-label {
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.export-error,
+.export-blocked {
+  font-size: 0.76rem;
+  line-height: 1.45;
+  padding: 0.55rem 0.7rem;
+  border-radius: 3px;
+  border: 1px solid rgba(244, 63, 94, 0.4);
+  background: rgba(244, 63, 94, 0.08);
+  color: var(--accent-rose);
+}
+
+.export-note {
+  font-size: 0.75rem;
+  line-height: 1.45;
+  padding: 0.5rem 0.7rem;
+  border-radius: 3px;
+  border: 1px solid rgba(245, 158, 11, 0.32);
+  background: rgba(245, 158, 11, 0.06);
+  color: var(--accent-amber);
+}
+
+.export-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding: 0.9rem 1.2rem;
+  border-top: 1px solid var(--border-subtle);
+}

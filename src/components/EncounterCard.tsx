@@ -1,0 +1,161 @@
+import React from 'react';
+import {
+  EncounterSample,
+  FrameRecord,
+  DedupRole,
+} from '../types/schema';
+import { CheckCircle2, Clock, XCircle, SkipForward, Flag, FileText, Image as ImageIcon, Layers, Crown } from 'lucide-react';
+
+interface EncounterCardProps {
+  encounter: EncounterSample;
+  frame?: FrameRecord;
+  dedupRole?: DedupRole;
+  dedupOf?: string;
+  isActive: boolean;
+  onSelect: (sampleId: string) => void;
+}
+
+export const EncounterCard: React.FC<EncounterCardProps> = ({
+  encounter,
+  frame,
+  dedupRole,
+  dedupOf,
+  isActive,
+  onSelect,
+}) => {
+  const primaryItem = encounter.items[0];
+  const hasText = primaryItem?.content && primaryItem.content.trim().length > 0;
+  const isFlagged = encounter.metadata?.isFlaggedForReview;
+  const itemCount = encounter.items?.length || 1;
+  const secondaryItemsCount = itemCount - 1;
+  // hasMedia is a UGC item-level property: a frame is media-bearing if ANY item has media.
+  const hasAnyMedia = encounter.items?.some((item) => item.hasMedia) ?? false;
+
+  const renderStatusBadge = () => {
+    switch (encounter.status) {
+      case 'annotated':
+        return (
+          <div className="card-status-badge status-pill annotated">
+            <CheckCircle2 size={12} />
+            <span>Curated</span>
+          </div>
+        );
+      case 'rejected':
+        return (
+          <div className="card-status-badge status-pill rejected">
+            <XCircle size={12} />
+            <span>Rejected</span>
+          </div>
+        );
+      case 'skipped':
+        return (
+          <div className="card-status-badge status-pill skipped">
+            <SkipForward size={12} />
+            <span>Skipped</span>
+          </div>
+        );
+      case 'pending':
+      default:
+        return (
+          <div className="card-status-badge status-pill pending">
+            <Clock size={12} />
+            <span>Pending</span>
+          </div>
+        );
+    }
+  };
+
+  return (
+    <div
+      className={`encounter-card ${isActive ? 'is-active' : ''} ${isFlagged ? 'is-flagged' : ''} ${
+        dedupRole === 'duplicate' ? 'is-suppressed' : ''
+      }`}
+      onClick={() => onSelect(encounter.sampleId)}
+    >
+      <div className="card-image-wrap">
+        {frame ? (
+          <img
+            src={frame.dataUrl}
+            alt={encounter.sampleId}
+            className="card-image"
+            loading="lazy"
+          />
+        ) : (
+          <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>
+            No image data
+          </div>
+        )}
+
+        <div className="card-platform-tag">
+          {encounter.platform}
+        </div>
+
+        {renderStatusBadge()}
+
+        {dedupRole === 'duplicate' && (
+          <div className="card-dedup-badge dup" title="Suppressed as a near-duplicate — restorable in the Deduplicate view">
+            <span>Duplicate{dedupOf ? ` of ${dedupOf}` : ''}</span>
+          </div>
+        )}
+
+        {dedupRole === 'representative' && (
+          <div className="card-dedup-badge rep" title="Representative of a duplicate group">
+            <Crown size={11} />
+            <span>Rep</span>
+          </div>
+        )}
+
+
+        {isFlagged && (
+          <div className="card-flag-badge" title="Flagged for researcher review">
+            <Flag size={11} />
+            <span>Flagged</span>
+          </div>
+        )}
+
+        {itemCount > 1 && (
+          <div className="card-multi-item-tag" title={`${itemCount} distinct UGC items transcribed in this frame`}>
+            <Layers size={11} />
+            <span>{itemCount} UGC Items</span>
+          </div>
+        )}
+      </div>
+
+      <div className="card-details">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span className="card-sample-id">{encounter.sampleId}</span>
+          <span className="card-ugc-type-pill">
+            {primaryItem?.role ? primaryItem.role : (encounter.metadata?.ugcType || 'post')}
+          </span>
+        </div>
+
+        <p className="card-preview-text">
+          {hasText ? primaryItem.content : <em style={{ color: 'var(--text-dim)' }}>No ground-truth transcription yet...</em>}
+        </p>
+
+        {secondaryItemsCount > 0 && (
+          <div className="card-secondary-preview">
+            <span>+{secondaryItemsCount} more visible {secondaryItemsCount === 1 ? 'item' : 'items'} (e.g. {encounter.items[1]?.role || 'reply'})</span>
+          </div>
+        )}
+
+        <div className="card-meta-bar">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {hasAnyMedia && (
+              <span title="Contains visual media" style={{ display: 'inline-flex' }}>
+                <ImageIcon size={12} />
+              </span>
+            )}
+            {(itemCount > 1 || encounter.metadata?.textDensity === 'high') && (
+              <span title="Text-dense or multi-item feed frame" style={{ display: 'inline-flex' }}>
+                <FileText size={12} />
+              </span>
+            )}
+            <span>{encounter.provenance.frameFilename || 'frame'}</span>
+          </div>
+          <span>{itemCount} {itemCount === 1 ? 'item' : 'items'}</span>
+        </div>
+      </div>
+    </div>
+  );
+};

@@ -1,0 +1,33 @@
+{
+  "name": "scrollnotes",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "verify:slice1": "esbuild src/test/verifySlice1.ts --bundle --platform=node --format=cjs --outfile=node_modules/.verify/s1.cjs --log-level=error && node node_modules/.verify/s1.cjs",
+    "verify:slice2": "esbuild src/test/verifySlice2.ts --bundle --platform=node --format=cjs --outfile=node_modules/.verify/s2.cjs --log-level=error && node node_modules/.verify/s2.cjs",
+    "verify:slice3": "esbuild src/test/verifySlice3.ts --bundle --platform=node --format=cjs --outfile=node_modules/.verify/s3.cjs --log-level=error && node node_modules/.verify/s3.cjs",
+    "verify:slice4": "esbuild src/test/verifySlice4.ts --bundle --platform=node --format=cjs --outfile=node_modules/.verify/s4.cjs --log-level=error && node node_modules/.verify/s4.cjs",
+    "verify:slice5": "esbuild src/test/verifySlice5.ts --bundle --platform=node --format=cjs --outfile=node_modules/.verify/s5.cjs --log-level=error && node node_modules/.verify/s5.cjs",
+    "verify:slice6": "esbuild src/test/verifySlice6.ts --bundle --platform=node --format=cjs --outfile=node_modules/.verify/s6.cjs --log-level=error && node node_modules/.verify/s6.cjs",
+    "verify": "npm run verify:slice1 && npm run verify:slice2 && npm run verify:slice3 && npm run verify:slice4 && npm run verify:slice5 && npm run verify:slice6"
+  },
+  "dependencies": {
+    "idb": "^8.0.2",
+    "lucide-react": "^1.16.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.9",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.3",
+    "vite": "^6.2.0"
+  }
+}
