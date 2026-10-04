@@ -4,7 +4,8 @@ import {
   FrameRecord,
   DedupRole,
 } from '../types/schema';
-import { CheckCircle2, Clock, XCircle, SkipForward, Flag, FileText, Image as ImageIcon, Layers, Crown } from 'lucide-react';
+import { CheckCircle2, Clock, XCircle, SkipForward, Flag, FileText, Image as ImageIcon, Layers, Crown, AlertTriangle } from 'lucide-react';
+import { QUALITY_FLAG_LABELS } from '../types/schema';
 
 interface EncounterCardProps {
   encounter: EncounterSample;
@@ -26,6 +27,11 @@ export const EncounterCard: React.FC<EncounterCardProps> = ({
   const primaryItem = encounter.items[0];
   const hasText = primaryItem?.content && primaryItem.content.trim().length > 0;
   const isFlagged = encounter.metadata?.isFlaggedForReview;
+  // Slice 7 §6 — quality-flag summary for the card badge (§25). Derived, never persisted
+  // at frame level, per §14.
+  const qualityFlags = encounter.metadata?.qualityFlags ?? [];
+  const qualityFlagCount = qualityFlags.length;
+  const qualityFlagNames = qualityFlags.map((f) => QUALITY_FLAG_LABELS[f] ?? f);
   const itemCount = encounter.items?.length || 1;
   const secondaryItemsCount = itemCount - 1;
   // hasMedia is a UGC item-level property: a frame is media-bearing if ANY item has media.
@@ -110,6 +116,19 @@ export const EncounterCard: React.FC<EncounterCardProps> = ({
           <div className="card-flag-badge" title="Flagged for researcher review">
             <Flag size={11} />
             <span>Flagged</span>
+          </div>
+        )}
+
+        {/* Slice 7 §6 — data quality flags (§25). The badge shows a count rather
+            than the flags themselves so the card stays scannable; the tooltip names
+            them. */}
+        {qualityFlagCount > 0 && (
+          <div
+            className="card-quality-badge"
+            title={`Data quality flags: ${qualityFlagNames.join(', ')}`}
+          >
+            <AlertTriangle size={11} />
+            <span>{qualityFlagCount}</span>
           </div>
         )}
 

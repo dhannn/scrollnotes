@@ -76,12 +76,63 @@ export const DEFAULT_DATASET_INFO: DatasetInfo = {
   name: 'Social Media UGC Benchmark',
   version: 'v0.1',
   description: 'Research fieldwork corpus for evaluating multimodal VLM performance on visual user-generated social media content.',
-  targetCount: 200,
-  lifecycleStatus: 'annotating',
+  targetMin: 150,
+  targetMax: 200,
+  // Slice 7: a fresh dataset is a DRAFT with setup incomplete. The previous default
+  // of 'annotating' made every first-run manifest claim mid-annotation on a corpus
+  // with zero samples, which violated AGENTS §24.
+  lifecycleStatus: 'draft',
   sampleIdPrefix: 'ugc',
+  isSetupComplete: false,
+  hasExportedBefore: false,
   createdAt: new Date().toISOString(),
   updatedAt: new Date().toISOString(),
 };
+
+/**
+ * Bring a persisted DatasetInfo up to the Slice 7 shape.
+ *
+ * Pure and idempotent. Two migrations run here:
+ * 1. `targetCount` -> `targetMin`/`targetMax`, defaulting the band to 80-100% of
+ *    the original single target (the heuristic proposed in plan_slice7.md).
+ * 2. Pre-Slice-7 datasets are re-onboarded once: `isSetupComplete` defaults to
+ *    false and the fabricated 'annotating' status is reset to 'draft'. Existing
+ *    samples are NOT touched - the researcher simply walks the wizard once.
+ */
+/**
+ * A dataset record as it may exist on disk: pre-Slice-7 records are missing
+ * `targetMin`/`targetMax` and the setup flags entirely, so the input is widened
+ * to accept them rather than forcing a cast at every call site.
+ */
+export type PersistedDatasetInfo = Omit<DatasetInfo, 'targetMin' | 'targetMax'> &
+  Partial<Pick<DatasetInfo, 'targetMin' | 'targetMax'>>;
+
+export function migrateDatasetInfo(info: PersistedDatasetInfo): DatasetInfo {
+  const legacyTarget =
+    typeof info.targetCount === 'number' && info.targetCount > 0 ? info.targetCount : null;
+
+  const targetMin =
+    typeof info.targetMin === 'number' && info.targetMin > 0
+      ? info.targetMin
+      : legacyTarget !== null
+        ? Math.max(1, Math.round(legacyTarget * 0.8))
+        : DEFAULT_DATASET_INFO.targetMin;
+  const targetMax =
+    typeof info.targetMax === 'number' && info.targetMax > 0
+      ? info.targetMax
+      : legacyTarget !== null
+        ? legacyTarget
+        : DEFAULT_DATASET_INFO.targetMax;
+
+  return {
+    ...info,
+    targetMin: Math.min(targetMin, targetMax),
+    targetMax: Math.max(targetMin, targetMax),
+    lifecycleStatus: info.lifecycleStatus ?? 'draft',
+    isSetupComplete: info.isSetupComplete ?? false,
+    hasExportedBefore: info.hasExportedBefore ?? false,
+  };
+}
 
 export async function getDB(): Promise<IDBPDatabase<ScrollnotesDB>> {
   if (!dbPromise) {
@@ -182,7 +233,13 @@ export async function getDatasetInfo(): Promise<DatasetInfo> {
     await db.put('dataset_info', DEFAULT_DATASET_INFO);
     return DEFAULT_DATASET_INFO;
   }
-  return info;
+  // Slice 7: migrate pre-Slice-7 datasets on read. Existing samples are never
+  // touched; the researcher is simply asked to walk the setup wizard once.
+  const migrated = migrateDatasetInfo(info);
+  if (migrated.targetMin !== info.targetMin || migrated.isSetupComplete !== info.isSetupComplete) {
+    await db.put('dataset_info', migrated);
+  }
+  return migrated;
 }
 
 export async function saveDatasetInfo(info: DatasetInfo): Promise<void> {

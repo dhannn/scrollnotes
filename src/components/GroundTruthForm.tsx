@@ -12,6 +12,9 @@ import {
   OcrStatus,
 } from '../types/schema';
 import { OCRPanel, previewSnippet } from './OCRPanel';
+import { QualityFlagPicker } from './QualityFlagPicker';
+import { toggleQualityFlag } from '../services/qualityFlags';
+import type { QualityFlag } from '../types/schema';
 import { applyOcrInsert } from '../services/ocrInsert';
 import {
   CheckCircle,
@@ -115,6 +118,16 @@ export const GroundTruthForm: React.FC<GroundTruthFormProps> = ({
   const [isFlaggedForReview, setIsFlaggedForReview] = useState<boolean>(
     encounter.metadata?.isFlaggedForReview ?? false
   );
+  // Slice 7 §6 — data quality flags (AGENTS §25). Previously write-only: fully
+  // plumbed to export, but no UI could set them.
+  const [qualityFlags, setQualityFlags] = useState<QualityFlag[]>(
+    encounter.metadata?.qualityFlags ?? []
+  );
+
+  const toggleFlag = (flag: QualityFlag) => {
+    setQualityFlags((prev) => toggleQualityFlag(prev, flag));
+    setSaveStatus('idle');
+  };
 
   const firstInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -149,6 +162,7 @@ export const GroundTruthForm: React.FC<GroundTruthFormProps> = ({
     setTextDensity(encounter.metadata?.textDensity || 'medium');
     setVisualDensity(encounter.metadata?.visualDensity || 'medium');
     setIsFlaggedForReview(encounter.metadata?.isFlaggedForReview ?? false);
+    setQualityFlags(encounter.metadata?.qualityFlags ?? []);
 
     setSaveStatus('saved');
 
@@ -232,21 +246,36 @@ export const GroundTruthForm: React.FC<GroundTruthFormProps> = ({
         textDensity: items.length > 1 ? 'high' : textDensity,
         visualDensity,
         isFlaggedForReview,
+        // Slice 7 §6 — flags ride along in the existing metadata write, so they
+        // cannot survive locally but fail to persist.
+        qualityFlags,
       },
     });
   };
 
-  // Hotkey listener for Ctrl+Shift+Enter / Alt+N to add item
+  // Slice 7 §7 — these used to be a private window listener each. They now subscribe to
+  // events emitted by the central shortcut registry in App.tsx, so there is exactly one
+  // keyboard listener in the application.
   useEffect(() => {
-    const handleAddHotkey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey && e.shiftKey && e.key === 'Enter') || (e.altKey && e.key.toLowerCase() === 'n')) {
-        e.preventDefault();
-        handleAddItem();
-      }
-    };
-    window.addEventListener('keydown', handleAddHotkey);
-    return () => window.removeEventListener('keydown', handleAddHotkey);
+    const onAddItem = () => handleAddItem();
+    window.addEventListener('scrollnotes:add-item', onAddItem);
+    return () => window.removeEventListener('scrollnotes:add-item', onAddItem);
   }, [items.length]);
+
+  useEffect(() => {
+    const onToggleMono = () => setIsMonospace((v) => !v);
+    window.addEventListener('scrollnotes:toggle-monospace', onToggleMono);
+    return () => window.removeEventListener('scrollnotes:toggle-monospace', onToggleMono);
+  }, []);
+
+  useEffect(() => {
+    const onToggleFlag = (e: Event) => {
+      const flag = (e as CustomEvent<QualityFlag>).detail;
+      if (flag) toggleFlag(flag);
+    };
+    window.addEventListener('scrollnotes:toggle-flag', onToggleFlag);
+    return () => window.removeEventListener('scrollnotes:toggle-flag', onToggleFlag);
+  }, [qualityFlags]);
 
   return (
     <div className="ground-truth-panel">
@@ -557,6 +586,11 @@ export const GroundTruthForm: React.FC<GroundTruthFormProps> = ({
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* Slice 7 §6 — data quality flags (AGENTS §25) */}
+          <div style={{ marginTop: '0.85rem' }}>
+            <QualityFlagPicker flags={qualityFlags} onToggle={toggleFlag} />
           </div>
 
           {/* Frame Feature toggles */}

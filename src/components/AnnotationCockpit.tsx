@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import {
   EncounterSample,
   FrameRecord,
@@ -11,6 +11,8 @@ import {
 } from '../types/schema';
 import { ImageViewer } from './ImageViewer';
 import { GroundTruthForm } from './GroundTruthForm';
+import { TouchActionBar } from './TouchActionBar';
+import type { ShortcutDef } from '../services/shortcuts';
 
 interface AnnotationCockpitProps {
   encounter: EncounterSample | null;
@@ -33,6 +35,8 @@ interface AnnotationCockpitProps {
   onSetStatus: (sampleId: string, status: EncounterStatus, advance: boolean) => void;
   onGoNext: () => void;
   onGoPrev: () => void;
+  /** Slice 7 §10.5 — the live registry, so the touch bar mirrors the key map. */
+  shortcuts: ShortcutDef[];
 }
 
 export const AnnotationCockpit: React.FC<AnnotationCockpitProps> = ({
@@ -49,42 +53,10 @@ export const AnnotationCockpit: React.FC<AnnotationCockpitProps> = ({
   onSetStatus,
   onGoNext,
   onGoPrev,
+  shortcuts,
 }) => {
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
-
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key === 'Enter') {
-        e.preventDefault();
-        if (encounter) {
-          const form = document.querySelector('form.form-scroll-area') as HTMLFormElement;
-          if (form) {
-            form.requestSubmit();
-          }
-        }
-      }
-
-      if (!isInput) {
-        if (e.key === 'ArrowLeft' && hasPrev) {
-          e.preventDefault();
-          onGoPrev();
-        } else if (e.key === 'ArrowRight' && hasNext) {
-          e.preventDefault();
-          onGoNext();
-        } else if (e.key.toLowerCase() === 'r' && encounter) {
-          e.preventDefault();
-          onSetStatus(encounter.sampleId, 'rejected', true);
-        } else if (e.key.toLowerCase() === 's' && encounter) {
-          e.preventDefault();
-          onSetStatus(encounter.sampleId, 'skipped', true);
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [encounter, hasNext, hasPrev, onGoNext, onGoPrev, onSetStatus]);
+  // Slice 7 §7 — keyboard handling moved to the central registry in App.tsx. Keeping a
+  // local listener here meant Esc and the navigation keys were bound in several places.
 
   if (!encounter) {
     return (
@@ -118,6 +90,12 @@ export const AnnotationCockpit: React.FC<AnnotationCockpitProps> = ({
         onSetStatus={onSetStatus}
         onGoNext={onGoNext}
         onGoPrev={onGoPrev}
+      />
+
+      {/* Slice 7 §10.5 — coarse-pointer equivalents of the keyboard map. */}
+      <TouchActionBar
+        shortcuts={shortcuts}
+        disabled={{ prev: !hasPrev, next: !hasNext }}
       />
     </div>
   );

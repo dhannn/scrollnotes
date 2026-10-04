@@ -225,7 +225,26 @@ export function validateForExport(input: ValidationInput): ExportValidation {
     sampleIds: limitIds(unresolvedDuplicates),
   });
 
-  // --- 8. Extraction runs -------------------------------------------------
+  // --- 8. Corpus size vs. intended target (ADVISORY) -----------------------
+  // Slice 7: the target is a planning RANGE, not an obligation. Undershooting is a
+  // legitimate research outcome, so this WARNS and never blocks. Integrity still
+  // blocks via the fail-severity checks above, which is what actually satisfies §24.
+  const annotatedTotal = exportable.length;
+  const { targetMin, targetMax } = dataset;
+  const belowTarget = annotatedTotal < targetMin;
+  const aboveTarget = annotatedTotal > targetMax;
+  checks.push({
+    id: 'target-attainment',
+    label: 'Corpus size vs. target',
+    severity: belowTarget ? 'warn' : 'pass',
+    detail: belowTarget
+      ? `${annotatedTotal} annotated sample(s) against an intended ${targetMin}-${targetMax}. The export remains valid; the manifest records the intended range and the attained count so the shortfall is explicit rather than hidden.`
+      : aboveTarget
+        ? `${annotatedTotal} annotated sample(s), above the intended maximum of ${targetMax}. Both the intended range and the attained count are recorded in the manifest.`
+        : `${annotatedTotal} annotated sample(s), within the intended ${targetMin}-${targetMax}.`,
+  });
+
+  // --- 9. Extraction runs -------------------------------------------------
   const badRuns = extractionRuns.filter((run) => run.status !== 'done');
   checks.push({
     id: 'extraction-runs',

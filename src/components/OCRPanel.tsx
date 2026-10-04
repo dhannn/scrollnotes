@@ -87,28 +87,20 @@ export const OCRPanel: React.FC<OCRPanelProps> = ({
     setTargetItemId(null);
   }, [frameId]);
 
-  // View-local OCR shortcuts: Alt+I inserts, Alt+O runs/re-runs.
+  // Slice 7 §7 — Alt+I / Alt+O are declared once in the central registry in App.tsx
+  // and arrive here as events, so there is exactly one keyboard listener in the app.
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!e.altKey || e.metaKey || e.ctrlKey) return;
-      const key = e.key.toLowerCase();
-      if (key === 'i') {
-        e.preventDefault();
-        if (!ocrArtifact || !targetItem) return;
-        if (!needsOcrInsertConfirmation(targetItem.content)) {
-          onInsertOcr(ocrArtifact.text, targetItem.id, 'replace');
-        } else {
-          setGuardOpen(true);
-        }
-      } else if (key === 'o') {
-        e.preventDefault();
-        onRunOcr(frameId);
+    const onInsert = () => {
+      if (!ocrArtifact || !targetItem) return;
+      if (!needsOcrInsertConfirmation(targetItem.content)) {
+        onInsertOcr(ocrArtifact.text, targetItem.id, 'replace');
+      } else {
+        setGuardOpen(true);
       }
     };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [frameId, ocrArtifact, targetItem, onInsertOcr, onRunOcr]);
+    window.addEventListener('scrollnotes:ocr-insert', onInsert);
+    return () => window.removeEventListener('scrollnotes:ocr-insert', onInsert);
+  }, [frameId, ocrArtifact, targetItem, onInsertOcr]);
 
 
   return (

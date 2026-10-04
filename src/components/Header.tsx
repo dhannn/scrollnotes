@@ -91,13 +91,13 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="header-stats">
           <div
             className="progress-widget"
-            title={`${stats.annotated} of ${datasetInfo.targetCount} target benchmark samples annotated`}
+            title={`${stats.annotated} of ${datasetInfo.targetMin ?? 150}-${datasetInfo.targetMax ?? 200} intended samples annotated`}
             onClick={onOpenDatasetSettings}
             style={{ cursor: 'pointer' }}
           >
             <Target size={13} style={{ color: 'var(--accent-sky)' }} />
             <span className="progress-text">
-              Target: <strong>{stats.annotated}</strong> / {datasetInfo.targetCount}
+              Intended: <strong>{stats.annotated}</strong> / {datasetInfo.targetMin ?? 150}
             </span>
             <div className="progress-bar-track">
               <div

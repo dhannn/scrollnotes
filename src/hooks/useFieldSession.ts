@@ -262,8 +262,10 @@ export function useFieldSession() {
     }
 
     const progressPercent = total > 0 ? Math.round((annotated / total) * 100) : 0;
-    const targetCount = datasetInfo.targetCount || 200;
-    const targetProgressPercent = Math.min(100, Math.round((annotated / targetCount) * 100));
+    // Progress is measured against the LOWER bound of the intended range (Slice 7 §4.2).
+    // The target is advisory, so this bar is guidance, never a completion gate.
+    const targetMin = datasetInfo.targetMin || 200;
+    const targetProgressPercent = Math.min(100, Math.round((annotated / targetMin) * 100));
 
     return {
       total,
@@ -274,11 +276,11 @@ export function useFieldSession() {
       skipped,
       flagged,
       progressPercent,
-      targetCount,
+      targetCount: targetMin,
       targetProgressPercent,
       platformCounts,
     };
-  }, [encounters, datasetInfo.targetCount]);
+  }, [encounters, datasetInfo.targetMin]);
 
   // Filtered & Sorted encounters for gallery
   const filteredEncounters = useMemo(() => {
@@ -286,7 +288,14 @@ export function useFieldSession() {
 
     // Status filter
     if (statusFilter === 'flagged') {
-      result = result.filter((e) => e.metadata?.isFlaggedForReview);
+      // Slice 7 §6 — a sample counts as flagged if EITHER the review flag is set OR
+      // any data quality flag is applied (§25). Previously quality flags were
+      // unreachable from the filter, so they were effectively dead data.
+      result = result.filter(
+        (e) =>
+          e.metadata?.isFlaggedForReview ||
+          (e.metadata?.qualityFlags?.length ?? 0) > 0
+      );
     } else if (statusFilter === 'multi-item') {
       result = result.filter((e) => e.items && e.items.length > 1);
     } else if (statusFilter !== 'all') {
@@ -388,6 +397,50 @@ export function useFieldSession() {
     setActiveSampleId(sampleId);
     setCurrentView('cockpit');
   }, []);
+
+  // --- Slice 7 §8: skip-to-next-unannotated -----------------------------
+  // Step 1 §8 promised this as the single biggest throughput win at 200+ samples:
+  // walking the raw list means re-reading every completed sample on the way through.
+  const unannotatedIndexes = useMemo(
+    () =>
+      encounters
+        .map((e, i) => ({ e, i }))
+        .filter(({ e }) => e.status === 'pending' || e.status === 'skipped')
+        .map(({ i }) => i),
+    [encounters]
+  );
+
+  const nextUnannotatedIndex = useMemo(() => {
+    if (unannotatedIndexes.length === 0) return null;
+    const after = unannotatedIndexes.find((i) => i > activeIndex);
+    return after ?? unannotatedIndexes[0];
+  }, [unannotatedIndexes, activeIndex]);
+
+  const prevUnannotatedIndex = useMemo(() => {
+    if (unannotatedIndexes.length === 0) return null;
+    const before = [...unannotatedIndexes].reverse().find((i) => i < activeIndex);
+    return before ?? unannotatedIndexes[unannotatedIndexes.length - 1];
+  }, [unannotatedIndexes, activeIndex]);
+
+  const goToNextUnannotated = useCallback(() => {
+    if (nextUnannotatedIndex === null) return;
+    setActiveSampleId(encounters[nextUnannotatedIndex].sampleId);
+    setCurrentView('cockpit');
+  }, [nextUnannotatedIndex, encounters]);
+
+  const goToPrevUnannotated = useCallback(() => {
+    if (prevUnannotatedIndex === null) return;
+    setActiveSampleId(encounters[prevUnannotatedIndex].sampleId);
+    setCurrentView('cockpit');
+  }, [prevUnannotatedIndex, encounters]);
+
+  /** Jump straight to the first outstanding sample, used by the lifecycle CTA. */
+  const goToFirstUnannotated = useCallback(() => {
+    if (unannotatedIndexes.length === 0) return false;
+    setActiveSampleId(encounters[unannotatedIndexes[0]].sampleId);
+    setCurrentView('cockpit');
+    return true;
+  }, [unannotatedIndexes, encounters]);
 
   // Update encounter in state & IndexedDB
   const updateEncounter = useCallback(
@@ -1157,6 +1210,13 @@ export function useFieldSession() {
     openSampleInCockpit,
     goToNext,
     goToPrev,
+    // Slice 7 §8 — skip-to-next-unannotated
+    nextUnannotatedIndex,
+    prevUnannotatedIndex,
+    unannotatedCount: unannotatedIndexes.length,
+    goToNextUnannotated,
+    goToPrevUnannotated,
+    goToFirstUnannotated,
     updateEncounter,
     updateDatasetMetadata,
     saveAndNext,

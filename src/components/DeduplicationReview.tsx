@@ -36,6 +36,8 @@ interface DeduplicationReviewProps {
   onMarkDuplicate: (frameId: string, representativeFrameId?: string) => void;
   onRestoreFrame: (frameId: string) => void;
   onSelectSample: (sampleId: string) => void;
+  /** Slice 7 §7 — a modal owns the keyboard, so dedup keys must not fire. */
+  modalOpen?: boolean;
 }
 
 const ALGORITHMS: { id: HashAlgorithm; label: string; desc: string }[] = [
@@ -77,6 +79,7 @@ export const DeduplicationReview: React.FC<DeduplicationReviewProps> = ({
   onMarkDuplicate,
   onRestoreFrame,
   onSelectSample,
+  modalOpen = false,
 }) => {
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false);
   const [cursor, setCursor] = useState<{ group: number; frame: number } | null>(null);
@@ -126,12 +129,16 @@ export const DeduplicationReview: React.FC<DeduplicationReviewProps> = ({
   const progressPct =
     dedupStatus.total > 0 ? Math.round((dedupStatus.processed / dedupStatus.total) * 100) : 0;
 
-  // View-scoped keyboard: groups/frames navigation, representative/duplicate/restore.
+  // Slice 7 §7 — the Deduplicate view keeps its own listener because its keys
+  // (arrows, Enter, D, U) drive a group/frame cursor that only exists here. The
+  // central registry explicitly excludes the dedup view for the arrow keys so the
+  // two never double-fire. A modal still suppresses these keys.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA';
       if (isInput || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (modalOpen) return;
       if (groups.length === 0) return;
 
       const current = cursor ?? { group: 0, frame: 0 };
@@ -167,7 +174,7 @@ export const DeduplicationReview: React.FC<DeduplicationReviewProps> = ({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [groups, cursor, dedupRecords, onSetRepresentative, onMarkDuplicate, onRestoreFrame]);
+  }, [groups, cursor, dedupRecords, onSetRepresentative, onMarkDuplicate, onRestoreFrame, modalOpen]);
 
   return (
     <div className="dedup-container">

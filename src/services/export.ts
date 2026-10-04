@@ -331,6 +331,15 @@ export function buildManifest(input: ManifestInput): ExportManifest {
       rejected: validation.counts.rejected,
       skipped: validation.counts.skipped,
       flaggedForReview,
+      // Slice 7 — intended range vs. what was actually built. Recording both keeps a
+      // shortfall explicit for anyone reading the corpus later.
+      targetRange: { min: dataset.targetMin, max: dataset.targetMax },
+      targetAttained: (() => {
+        const n = samples.length;
+        if (n < dataset.targetMin) return 'below' as const;
+        if (n > dataset.targetMax) return 'above' as const;
+        return 'in-range' as const;
+      })(),
     },
     platformCounts: countBy(samples, (sample) => sample.platform),
     qualityFlagCounts: summariseQualityFlags(samples),

@@ -14,7 +14,8 @@ class MockSlice2Session {
     name: 'Social Media UGC Benchmark',
     version: 'v0.1',
     description: 'Fieldwork corpus',
-    targetCount: 200,
+    targetMin: 160,
+    targetMax: 200,
     lifecycleStatus: 'annotating',
     sampleIdPrefix: 'ugc',
     createdAt: new Date().toISOString(),
@@ -111,8 +112,10 @@ class MockSlice2Session {
     }
 
     const progressPercent = total > 0 ? Math.round((annotated / total) * 100) : 0;
-    const targetCount = this.datasetInfo.targetCount || 200;
-    const targetProgressPercent = Math.min(100, Math.round((annotated / targetCount) * 100));
+    // Progress is measured against the LOWER bound of the intended range (Slice 7 §4.2):
+// the target is advisory, so this is guidance rather than a completion gate.
+    const targetMin = this.datasetInfo.targetMin || 200;
+    const targetProgressPercent = Math.min(100, Math.round((annotated / targetMin) * 100));
 
     return {
       total,
@@ -122,7 +125,7 @@ class MockSlice2Session {
       skipped,
       flagged,
       progressPercent,
-      targetCount,
+      targetCount: targetMin,
       targetProgressPercent,
       platformCounts,
     };
@@ -160,12 +163,19 @@ function runSlice2Verification() {
   const info = session.getDatasetInfo();
   console.assert(info.name === 'Social Media UGC Benchmark');
   console.assert(info.lifecycleStatus === 'annotating');
-  console.assert(info.targetCount === 200);
+  console.assert(info.targetMin === 160);
+console.assert(info.targetMax === 200);
 
-  session.updateDatasetInfo({ name: 'VLM Social Ground Truth v2', targetCount: 250, lifecycleStatus: 'ready' });
+  session.updateDatasetInfo({
+    name: 'VLM Social Ground Truth v2',
+    targetMin: 200,
+    targetMax: 250,
+    lifecycleStatus: 'ready',
+  });
   const updatedInfo = session.getDatasetInfo();
   console.assert(updatedInfo.name === 'VLM Social Ground Truth v2');
-  console.assert(updatedInfo.targetCount === 250);
+  console.assert(updatedInfo.targetMin === 200);
+  console.assert(updatedInfo.targetMax === 250);
   console.assert(updatedInfo.lifecycleStatus === 'ready');
   console.log('  ✓ Test 1 Passed: Dataset info, target counts, and lifecycle transitions verified');
 
@@ -215,7 +225,8 @@ function runSlice2Verification() {
   console.assert(stats.platformCounts.tiktok === 1);
   console.assert(stats.platformCounts.youtube === 1);
   console.assert(stats.platformCounts.threads === 1);
-  console.assert(stats.targetCount === 250);
+  // Progress is measured against the LOWER bound of the intended range.
+  console.assert(stats.targetCount === 200);
   console.log('  ✓ Test 5 Passed: Platform distribution breakdown & target benchmark statistics verified');
 
   console.log('\n🎉 ALL SLICE 2 VERIFICATION TESTS PASSED SUCCESSFULLY!');

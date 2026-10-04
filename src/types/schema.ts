@@ -10,6 +10,13 @@ export type Platform =
 
 export type EncounterStatus = 'pending' | 'annotated' | 'rejected' | 'skipped';
 
+/**
+ * How a corpus compares to its intended size range. Slice 7 §4.2: the target is a
+ * planning RANGE and is ADVISORY — it never blocks export or the lifecycle. Only
+ * objective integrity (pending samples, failing checks, provenance holes) does.
+ */
+export type TargetAttainment = 'below' | 'in-range' | 'above' | 'unset';
+
 export type DatasetLifecycleStatus =
   | 'draft'
   | 'curating'
@@ -129,9 +136,25 @@ export interface DatasetInfo {
   name: string;
   version: string;
   description: string;
-  targetCount: number;
+  /**
+   * Intended corpus size. Slice 7 replaced the single `targetCount` with a range
+   * because fieldwork does not hit a predicted N: the researcher usually discovers
+   * they have "about 150-200" usable encounters, not exactly 200.
+   *
+   * ADVISORY ONLY (Slice 7 §4.2). The target never gates the lifecycle - only
+   * objective integrity (pending samples, failing checks, provenance holes) does.
+   * Undershooting is surfaced as a warning and recorded in the manifest.
+   */
+  targetMin: number;
+  targetMax: number;
+  /** Retained for datasets persisted before Slice 7; see migrateDatasetInfo(). */
+  targetCount?: number;
   lifecycleStatus: DatasetLifecycleStatus;
   sampleIdPrefix: string;
+  /** False until the setup wizard is completed. See artifacts/plan_slice7.md §5. */
+  isSetupComplete?: boolean;
+  /** True once a corpus bundle has been produced, so `exported` survives reload. */
+  hasExportedBefore?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -464,6 +487,13 @@ export interface ExportManifest {
     rejected: number;
     skipped: number;
     flaggedForReview: number;
+    /**
+     * Slice 7 — the intended corpus size is a RANGE and is ADVISORY. Recording both
+     * the intended band and the attained count lets a reader see the shortfall
+     * explicitly rather than having to infer it, which is what §24 asks for.
+     */
+    targetRange: { min: number; max: number };
+    targetAttained: TargetAttainment;
   };
   platformCounts: Record<string, number>;
   qualityFlagCounts: Record<string, number>;

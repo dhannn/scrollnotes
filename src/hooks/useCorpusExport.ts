@@ -31,6 +31,8 @@ interface UseCorpusExportInput {
   dedupRecords: Map<string, DedupRecord>;
   recordings: RecordingRecord[];
   extractionRuns: ExtractionRun[];
+  /** Called after a bundle is successfully produced, so `exported` survives a reload. */
+  onExportSuccess?: () => void | Promise<void>;
 }
 
 const encoder = new TextEncoder();
@@ -118,6 +120,10 @@ export function useCorpusExport(input: UseCorpusExportInput) {
         });
 
         setLastBundle(bundle);
+
+        // Slice 7: record the export BEFORE the early returns below, so every
+        // successful format counts as "a corpus has been produced".
+        await input.onExportSuccess?.();
 
         if (bundle.annotations.length === 0) {
           setErrorMessage(
