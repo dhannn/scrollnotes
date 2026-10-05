@@ -55,7 +55,6 @@ import {
   planExtraction,
   normaliseSamplingConfig,
   computeSamplingGrid,
-  deriveRecordingId,
   deriveRunId,
   deriveFrameId,
   DECODE_ERROR_MESSAGE,
@@ -140,6 +139,49 @@ export function useFieldSession() {
   });
   /** In-flight cancellation handle for the current extraction run. */
   const extractionAbortRef = useRef<AbortController | null>(null);
+
+  /**
+   * Monotonic id allocators (Slice 8 — bulk ingestion).
+   *
+   * WHY A REF AND NOT STATE: `importRecordingFile` and `runFrameExtraction`
+   * previously derived ids from `recordings.size` / `encounters.length`. That is
+   * safe for ONE import at a time because React re-renders between calls, but
+   * bulk ingestion calls them in a LOOP inside a single tick — the state has not
+   * committed yet, so every iteration would read the same stale count and mint
+   * the SAME id. For recordings that silently overwrote each other in IndexedDB
+   * (`keyPath: 'recordingId'`), losing data; for samples it produced duplicate
+   * `sampleId`s, which breaks the stable-identity guarantee (AGENTS §21).
+   *
+   * A ref increments synchronously, so ids stay unique within a batch. Both
+   * allocators still skip ids already present in the store, so a re-import after
+   * a reload can never collide with an existing record.
+   */
+  const recordingSeqRef = useRef(0);
+  const sampleSeqRef = useRef(0);
+  /** Monotonic run counter so ids stay unique within a single bulk batch. */
+  const runSeqRef = useRef(0);
+
+  /** Next unused recording id, skipping anything already persisted. */
+  const allocateRecordingId = useCallback(() => {
+    let candidate = recordingSeqRef.current;
+    // Bounded loop: only runs while colliding, never unbounded.
+    while (recordings.has(`rec-${String(candidate + 1).padStart(4, '0')}`)) {
+      candidate += 1;
+    }
+    recordingSeqRef.current = candidate + 1;
+    return `rec-${String(candidate + 1).padStart(4, '0')}`;
+  }, [recordings]);
+
+  /** Next unused sample counter, skipping any id already in the corpus. */
+  const allocateSampleCounter = useCallback(() => {
+    const existing = encounters.length ? encounters : [];
+    let candidate = Math.max(sampleSeqRef.current, existing.length);
+    while (existing.some((e) => e.sampleId.endsWith(String(candidate + 1).padStart(6, '0')))) {
+      candidate += 1;
+    }
+    sampleSeqRef.current = candidate + 1;
+    return candidate + 1;
+  }, [encounters]);
 
   const [samplingConfig, setSamplingConfigState] =
     useState<SamplingConfig>(DEFAULT_SAMPLING_CONFIG);
@@ -600,11 +642,22 @@ export function useFieldSession() {
         probe = await probeRecording(file);
       } catch {
         // Never surface a raw DOMException to the researcher (AGENTS §39).
+        // The status MUST be reset here: it was set to 'probing' above, and on the
+        // failure path nothing else clears it — leaving a progress bar stuck at
+        // "Reading recording…" forever, which in a bulk batch looked like the app
+        // was still working after every file had already failed.
+        setExtractionStatus({
+          recordingId: null,
+          phase: 'idle',
+          processed: 0,
+          total: 0,
+          warnings: [],
+        });
         throw new Error(DECODE_ERROR_MESSAGE);
       }
 
       const recording: RecordingRecord = {
-        recordingId: deriveRecordingId(recordings.size),
+        recordingId: allocateRecordingId(),
         filename: file.name,
         ...(probe.durationMs ? { durationMs: probe.durationMs } : {}),
         sizeBytes: file.size,
@@ -628,7 +681,54 @@ export function useFieldSession() {
 
       return recording;
     },
-    [recordings.size]
+    // `recordings.size` was the dep: it re-created the callback per render, but
+    // inside a bulk loop the value is stale. The ref allocator is now the
+    // authority, so the dep follows the map it consults.
+    [allocateRecordingId]
+  );
+
+  /**
+   * Import MANY recordings in one action (Slice 8).
+   *
+   * Sequential, never parallel: `probeRecording` decodes video metadata through a
+   * hidden <video> element, and decoding N recordings at once multiplies peak
+   * memory by N. Sequential probing of a handful of files is imperceptible.
+   *
+   * PARTIAL FAILURE IS THE POINT. One undecodable file (a .mov Chrome refuses, a
+   * zero-byte download) must not abandon the other nine, and must never discard
+   * the ones that already imported. Every failure is reported by filename, and
+   * the successfully-imported recordings stay usable (AGENTS §39).
+   */
+  const importRecordings = useCallback(
+    async (files: File[]) => {
+            const imported: { recording: RecordingRecord; file: File }[] = [];
+      const failures: { filename: string; message: string }[] = [];
+
+      for (const file of files) {
+        try {
+          const recording = await importRecordingFile(file);
+          // Store the PAIR, never a parallel array. The researcher can select the
+          // same file twice, so pairing by filename or by index is ambiguous.
+          imported.push({ recording, file });
+        } catch (error) {
+          failures.push({
+            filename: file.name,
+            message:
+              error instanceof Error
+                ? error.message
+                : 'This recording could not be read in your browser.',
+          });
+        }
+      }
+
+      // A batch where every file failed is NOT thrown. The caller renders a
+      // per-file list that names each offender; throwing here would replace that
+      // specific report with one generic message, losing the only useful detail
+      // (which file to fix). The empty `imported` array already signals total
+      // failure to the caller.
+      return { imported, failures };
+    },
+    [importRecordingFile]
   );
 
   const setSamplingConfig = useCallback((patch: Partial<SamplingConfig>) => {
@@ -668,7 +768,16 @@ export function useFieldSession() {
       const controller = new AbortController();
       extractionAbortRef.current = controller;
 
-      const runId = deriveRunId(extractionRuns.size);
+      // Run ids must be unique within a single batch too. `extractionRuns.size` is
+      // stale across a bulk loop and the `Date.now()` suffix can repeat when two
+      // extractions land in the same millisecond, so a monotonic ref is mixed in.
+      // The run map is keyed by runId: a collision would silently overwrite an
+      // earlier run's record and lose its frame provenance.
+      const runId = deriveRunId(
+        Math.max(extractionRuns.size, runSeqRef.current),
+        runSeqRef.current
+      );
+      runSeqRef.current += 1;
       const { run } = planExtraction({ runId, recording, sampling: normalised });
 
       // Persist the run up front so an interrupted extraction is still auditable.
@@ -714,7 +823,10 @@ export function useFieldSession() {
         setExtractionStatus((prev) => ({ ...prev, phase: 'persisting' }));
 
         const prefix = datasetInfo.sampleIdPrefix || 'ugc';
-        let counter = encounters.length + 1;
+        // Per-frame allocation from the monotonic ref. The previous
+        // `encounters.length + 1` counter was correct only for a single run: in a
+        // bulk loop the state has not committed, so a SECOND recording would reuse
+        // the first's counters and mint duplicate sampleIds (AGENTS §21).
         const newFrames: FrameRecord[] = [];
         const newEncounters: EncounterSample[] = [];
 
@@ -723,12 +835,11 @@ export function useFieldSession() {
           const timestampMs = result.timestampsMs[i];
 
           const encounterRecord = createEncounterForFrame(frame, {
-            counter,
+            counter: allocateSampleCounter(),
             sampleIdPrefix: prefix,
             recordingId: recording.recordingId,
             timestampMs,
           });
-          counter++;
 
           // Persist immediately — an interrupted run must not lose captured work.
           await saveFrame(frame);
@@ -804,7 +915,56 @@ export function useFieldSession() {
       encounters.length,
       datasetInfo.sampleIdPrefix,
       activeSampleId,
+      allocateSampleCounter,
     ]
+  );
+
+  /**
+   * Extract frames from MANY recordings, one after another (Slice 8).
+   *
+   * Sequential and resumable-by-design: each entry completes and persists fully
+   * before the next begins, so cancelling stops the batch cleanly with every
+   * already-extracted recording intact. Running them in parallel would hold N
+   * decoded video elements and N sets of full-resolution canvases in memory at
+   * once — the same reason the extractor persists frame-by-frame.
+   *
+   * A failure on one recording does NOT stop the rest. Extracting ten sessions
+   * where one file is corrupt must still yield nine usable ones, and the failure
+   * is reported at the end rather than swallowed.
+   */
+  const runBulkExtraction = useCallback(
+    async (
+      entries: { recording: RecordingRecord; file: File }[],
+      onProgress?: (done: number, total: number, current: RecordingRecord) => void
+    ) => {
+      const failures: { filename: string; message: string }[] = [];
+      let completed = 0;
+      // Tracked locally: `runFrameExtraction` clears `extractionAbortRef` in its
+      // `finally`, so reading the ref AFTER the loop would always report
+      // "not cancelled" and silently mislabel a stopped batch as complete.
+      let sawAbort = false;
+
+      for (const entry of entries) {
+        if (sawAbort || extractionAbortRef.current?.signal.aborted) break;
+
+        const result = (await runFrameExtraction(entry.recording, entry.file)) as
+          | { error?: string }
+          | undefined;
+
+        if (result?.error) {
+          failures.push({ filename: entry.recording.filename, message: result.error });
+        }
+
+        completed += 1;
+        onProgress?.(completed, entries.length, entry.recording);
+
+        // Re-check after each item, since that is when the user may have hit cancel.
+        if (extractionAbortRef.current?.signal.aborted) sawAbort = true;
+      }
+
+      return { completed, failures, cancelled: sawAbort };
+    },
+    [runFrameExtraction]
   );
 
   /**
@@ -1249,6 +1409,8 @@ export function useFieldSession() {
     extractionStatus,
     samplingConfig,
     importRecordingFile,
+    importRecordings,
+    runBulkExtraction,
     setSamplingConfig,
     previewSamplingGrid,
     runFrameExtraction,

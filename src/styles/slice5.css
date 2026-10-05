@@ -165,9 +165,19 @@
 /* ---- Right: sampling controls ------------------------------------------- */
 
 .sessions-import-btn,
-.sessions-extract-btn {
+.sessions-extract-btn,
+.sessions-extract-all-btn {
   width: 100%;
   justify-content: center;
+  margin-bottom: 0.9rem;
+}
+
+/* Bulk extraction is a batch job, not the primary path — it is secondary so the
+   single-recording flow stays the obvious default (AGENTS §37). A full-width
+   button directly under the primary import button would read as two competing
+   primary actions. */
+.sessions-extract-all-btn {
+  margin-top: -0.4rem;
   margin-bottom: 0.9rem;
 }
 

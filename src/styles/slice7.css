@@ -674,7 +674,285 @@
   }
 }
 
-/* --- Touch action bar (cockpit) -------------------------------------------- */
+/* --- Gallery filter disclosure -------------------------------------------- */
+
+/* The toggle is inert chrome on desktop, so it is hidden there. The groups it
+   controls stay permanently expanded on desktop — note that NO rule outside the
+   media queries below reads `data-open`, so the desktop filter bar can never be
+   collapsed by this mobile affordance. */
+.gallery-filter-toggle {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0.4rem 0.7rem;
+  background: var(--bg-core);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.gallery-filter-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: var(--accent-sky);
+  color: #06121f;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+.gallery-filter-caret {
+  transition: transform 140ms ease;
+}
+
+.gallery-filter-caret.open {
+  transform: rotate(180deg);
+}
+
+/* ============================================================================
+   SLICE 7 §10 — GALLERY CHROME BUDGET (phones)
+
+   Measured on mobile-390 (screenshots/mobile-390-gallery-populated.png): the
+   five filter groups plus the distribution strip consumed ~91% of the viewport
+   height, pushing the frame grid almost entirely below the fold. The gallery is
+   a triage surface — the CARDS are the content, the toolbar is the chrome — so
+   on a phone the groups collapse behind the disclosure button and the cards get
+   the space.
+
+   All rules are additive and pointer/narrow-gated: the desktop workstation,
+   where the expanded filter bar is the correct layout, is untouched.
+   ========================================================================== */
+@media (max-width: 620px) {
+  .gallery-toolbar {
+    padding: 0.6rem 0.75rem;
+  }
+
+  .gallery-filter-toggle {
+  display: flex;
+    flex: none;
+  }
+
+  /* The action row held four controls on ONE line and ran 560px wide in a 390px
+     viewport, clipping "Annotate Session", "OCR all frames" and "Deduplicate"
+     past the right edge. Let it wrap, and let the primary CTA take the full
+     width so it stays a comfortable thumb target (§19). */
+  .gallery-actions-row {
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 0.5rem !important;
+  }
+
+  .gallery-actions-row > * {
+    min-width: 0;
+  }
+
+  .gallery-actions-row .btn,
+  .gallery-actions-row .gallery-filter-toggle {
+    min-height: 44px;
+  }
+
+  .gallery-actions-row .btn-primary {
+    order: -1;
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  /* Collapsed by default. `display:none` (not `visibility`) keeps the closed
+     groups out of the accessibility tree and out of the tap order, so a screen
+     reader does not walk 24 pills the researcher cannot see. */
+  .gallery-filter-groups[data-open='false'] {
+    display: none;
+  }
+
+  .gallery-filter-groups[data-open='true'] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  /* Pills scroll horizontally instead of wrapping into a 24-chip wall. Keeps
+     every filter reachable without giving the toolbar permanent height. */
+  .gallery-filter-groups .filter-group {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    /* Bleed to the container edge so a swiped chip isn't cut mid-glyph. */
+    margin: 0 -0.75rem;
+    padding: 0.2rem 0.75rem;
+  }
+
+  .gallery-filter-groups .filter-group::-webkit-scrollbar {
+    display: none;
+  }
+
+  .gallery-filter-groups .filter-group > * {
+    flex: none;
+  }
+
+  .gallery-filter-groups .filter-btn,
+  .gallery-filter-groups .platform-pill {
+    min-height: 44px;
+    font-size: 0.8rem;
+  }
+
+  /* The strip duplicates the platform pill counts a third time (§36). */
+  .distribution-strip {
+    display: none;
+  }
+
+  /* "Annotate Session" was clipped at the viewport edge because the action row
+     sat beside a `min-width:260px` search field. Let the search field shrink
+     and let the actions wrap to their own full-width row. */
+  .gallery-toolbar .search-bar-wrap {
+    min-width: 0 !important;
+    flex: 1 1 100% !important;
+  }
+
+  .gallery-toolbar .btn-sm {
+    white-space: nowrap;
+  }
+}
+
+@media (pointer: coarse) {
+  /* Touch layout regardless of window width — a tablet held in portrait and a
+     large phone in landscape should behave the same. These MUST mirror the
+     `max-width: 620px` block above: revealing the toggle without teaching the
+     panel to collapse would show the researcher BOTH a "Filters" button and the
+     24 pills it is supposed to replace. */
+  .gallery-filter-toggle {
+    display: flex;
+  }
+
+  .gallery-actions-row {
+    flex-wrap: wrap;
+    width: 100%;
+    gap: 0.5rem !important;
+  }
+
+  .gallery-actions-row > * {
+    min-width: 0;
+  }
+
+  .gallery-actions-row .btn,
+  .gallery-actions-row .gallery-filter-toggle {
+    min-height: 44px;
+  }
+
+  .gallery-actions-row .btn-primary {
+    order: -1;
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+
+  .gallery-filter-groups[data-open='false'] {
+    display: none;
+  }
+
+  .gallery-filter-groups[data-open='true'] {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  .gallery-filter-groups .filter-group {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    margin: 0 -0.75rem;
+    padding: 0.2rem 0.75rem;
+  }
+
+  .gallery-filter-groups .filter-group::-webkit-scrollbar {
+    display: none;
+  }
+
+  .gallery-filter-groups .filter-group > * {
+    flex: none;
+  }
+
+  .gallery-filter-groups .filter-btn,
+  .gallery-filter-groups .platform-pill {
+    min-height: 44px;
+    font-size: 0.8rem;
+  }
+
+  .distribution-strip {
+    display: none;
+  }
+
+  .gallery-toolbar .btn-sm {
+    white-space: nowrap;
+  }
+}
+
+/* Short viewports — landscape phones in particular. Here the constraint INVERTS:
+   at 844x390 a 160px toolbar is 41% of the screen, because the search field is
+   forced onto its own full-width row by the narrow-viewport rule above. On a
+   wide-but-short screen there is horizontal room to spare, so keep search and
+   the controls on one line and spend the space vertically on the cards. */
+/* --- Short viewports: the whole chrome stack, not just the gallery toolbar -----
+   The grid budget failed on landscape-844 (390px tall) with the toolbar already
+   within budget: header (64) + lifecycle (36) + toolbar consumed enough that the
+   cards were left with a third of the screen. The cards are the content, so on a
+   short screen every always-visible chrome layer gives up height together. */
+@media (max-height: 560px) {
+  .app-header {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .lifecycle-bar {
+    padding: 0.3rem 0.75rem;
+  }
+
+  /* Progress is redundant on a screen this short — the status pill and the count
+     still answer "where am I?" (§15). Hiding it is a pure height win with no
+     touch-target cost, unlike shrinking controls, which would trade a documented
+     44px guarantee for a few pixels. */
+  .lifecycle-bar-track {
+    display: none;
+  }
+}
+
+@media (max-height: 560px) {
+  .gallery-toolbar {
+    padding: 0.4rem 0.75rem;
+  }
+
+  /* Undo the narrow-viewport stacking: `100%` basis forced a second row that the
+     short screen cannot afford. */
+  .gallery-toolbar .search-bar-wrap {
+    flex: 1 1 260px !important;
+  }
+
+  .gallery-actions-row {
+    width: auto;
+    flex: 1 1 auto;
+  }
+
+  /* The primary CTA gave up its full-width row to gain vertical space; it can
+     stay a normal control here because the row is horizontal again. */
+  .gallery-actions-row .btn-primary {
+    flex: 0 0 auto;
+  }
+
+  /* Touch targets stay at 44px here. Compressing them would buy ~4px of grid and
+     cost a documented accessibility guarantee — a bad trade, and the tap-target
+     assertion exists precisely to stop it. Height on a short viewport is won
+     by hiding redundant rows (the progress track), not by shrinking controls. */
+  .gallery-actions-row .btn,
+  .gallery-filter-toggle {
+    min-height: 44px;
+  }
+}
 .touch-action-bar {
   display: none;
   align-items: center;

@@ -9,6 +9,18 @@ interface RecordingImporterProps {
   extractionStatus: ExtractionStatus;
   samplingConfig: SamplingConfig;
   onImportRecording: (file: File) => Promise<RecordingRecord>;
+  /** Bulk import (Slice 8): imports many recordings, reporting partial failures. */
+  onImportRecordings: (
+    files: File[]
+  ) => Promise<{
+    imported: { recording: RecordingRecord; file: File }[];
+    failures: { filename: string; message: string }[];
+  }>;
+  /** Bulk extraction: runs one recording at a time, reporting per-recording failures. */
+  onRunBulkExtraction: (
+    entries: { recording: RecordingRecord; file: File }[],
+    onProgress?: (done: number, total: number, current: RecordingRecord) => void
+  ) => Promise<{ completed: number; failures: { filename: string; message: string }[]; cancelled: boolean }>;
   onSetSamplingConfig: (patch: Partial<SamplingConfig>) => void;
   onPreviewGrid: (recording: RecordingRecord) => { timestampsMs: number[]; truncated: boolean; warning?: string };
   onRunExtraction: (recording: RecordingRecord, file: File) => Promise<unknown>;
@@ -39,6 +51,8 @@ export const RecordingImporter: React.FC<RecordingImporterProps> = ({
   extractionStatus,
   samplingConfig,
   onImportRecording,
+  onImportRecordings,
+  onRunBulkExtraction,
   onSetSamplingConfig,
   onPreviewGrid,
   onRunExtraction,
@@ -54,6 +68,20 @@ export const RecordingImporter: React.FC<RecordingImporterProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedRecording, setSelectedRecording] = useState<RecordingRecord | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+
+  /**
+   * Bulk import state (Slice 8).
+   *
+   * `pendingFiles` keeps the File handle for every just-imported recording. A
+   * `RecordingRecord` only stores metadata, so without holding the File there is
+   * nothing to extract from after a reload — the researcher would have to
+   * re-select every file. Cleared on extraction so memory is not held forever.
+   */
+  const [pendingFiles, setPendingFiles] = useState<Map<string, File>>(new Map());
+  const [failedImports, setFailedImports] = useState<{ filename: string; message: string }[]>([]);
+  const [isImporting, setIsImporting] = useState(false);
+  /** Non-null while a bulk extraction batch is running. */
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number } | null>(null);
 
   const isRunning = ['probing', 'extracting', 'persisting'].includes(extractionStatus.phase);
 
@@ -74,9 +102,60 @@ export const RecordingImporter: React.FC<RecordingImporterProps> = ({
     }
   };
 
+  /**
+   * Import several recordings in one action.
+   *
+   * A partial failure is surfaced per filename and never blocks the successes —
+   * dropping nine good sessions because one .mov is undecodable would be worse
+   * than the failure itself.
+   */
+  const handleVideosPicked = async (files: File[]) => {
+    if (files.length === 0) return;
+    setImportError(null);
+    setFailedImports([]);
+    setIsImporting(true);
+
+    try {
+      const { imported, failures } = await onImportRecordings(files);
+      setFailedImports(failures);
+
+      if (imported.length > 0) {
+        // Select the first so the Extract panel is immediately actionable, and
+        // remember every (recording, File) pair for bulk extraction. The pairs
+        // come from the hook, so no index or filename guessing is needed here.
+        const first = imported[0];
+        setSelectedRecording(first.recording);
+        setSelectedFile(first.file);
+        setPendingFiles((prev) => {
+          const next = new Map(prev);
+          imported.forEach(({ recording, file }) => next.set(recording.recordingId, file));
+          return next;
+        });
+      } else if (failures.length > 0) {
+        // Every file failed. The per-file list below already names each one, so
+        // do NOT also show the generic message here — the researcher should never
+        // be told "a video failed" without being told WHICH video.
+        setImportError(null);
+      }
+    } catch (error) {
+      setImportError(
+        error instanceof Error
+          ? error.message
+          : 'These recordings could not be read in your browser.'
+      );
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const handleVideoInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) void handleVideoPicked(file);
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    // One file keeps the single-recording path so existing behaviour (and the
+    // per-file error message) is unchanged for the common case.
+    if (files.length === 1) void handleVideoPicked(files[0]);
+    else void handleVideosPicked(files);
+    // Reset so re-picking the same file still fires a change event.
     e.target.value = '';
   };
 
@@ -88,6 +167,37 @@ export const RecordingImporter: React.FC<RecordingImporterProps> = ({
     if (result && !result.error) {
       onExtractionComplete();
     }
+  };
+
+  /**
+   * Extract every pending recording, one after another.
+   *
+   * The button is only enabled when the researcher has File handles in memory —
+   * after a reload the recordings are still listed, but their source files are
+   * gone, so the action is unavailable rather than silently failing.
+   */
+  const handleExtractAll = async () => {
+    const entries = [...pendingFiles.entries()].map(([recordingId, file]) => ({
+      recording: recordings.find((r) => r.recordingId === recordingId)!,
+      file,
+    }));
+
+    const usable = entries.filter((e) => e.recording);
+    if (usable.length === 0) return;
+
+    setFailedImports([]);
+    const { failures, cancelled } = await onRunBulkExtraction(usable, (done, total) =>
+      setBatchProgress({ done, total })
+    );
+    setBatchProgress(null);
+    setFailedImports(failures);
+
+    // Release the File handles; a completed batch must not pin them in memory.
+    setPendingFiles(new Map());
+
+    // Navigate only on real completion — a cancelled batch is a deliberate stop,
+    // and yanking the researcher away would hide what they just did.
+    if (!cancelled && failures.length === 0) onExtractionComplete();
   };
 
   const grid = selectedRecording ? onPreviewGrid(selectedRecording) : null;
@@ -205,6 +315,9 @@ export const RecordingImporter: React.FC<RecordingImporterProps> = ({
           type="file"
           ref={videoInputRef}
           onChange={handleVideoInput}
+          // `multiple` is what makes multi-select work; without it the picker
+          // allows exactly one file, which is the reported bug.
+          multiple
           accept={VIDEO_ACCEPT}
           style={{ display: 'none' }}
         />
@@ -225,11 +338,72 @@ export const RecordingImporter: React.FC<RecordingImporterProps> = ({
         <button
           className="btn btn-primary sessions-import-btn"
           onClick={() => videoInputRef.current?.click()}
-          disabled={isRunning}
+          disabled={isRunning || isImporting}
         >
           <FileVideo size={16} />
-          <span>Select a screen recording…</span>
+          <span>
+            {isImporting ? 'Importing recordings…' : 'Select screen recordings…'}
+          </span>
         </button>
+
+        {/* Bulk extraction. Disabled when no File handles are in memory — after a
+            reload the recordings persist but their sources do not, so re-select
+            them rather than silently extracting nothing. */}
+        {pendingFiles.size > 1 && !batchProgress && (
+          <button
+            className="btn btn-secondary sessions-extract-all-btn"
+            onClick={() => void handleExtractAll()}
+            disabled={isRunning || isImporting}
+          >
+            <Play size={16} />
+            <span>
+              Extract frames from all {pendingFiles.size} recordings
+            </span>
+          </button>
+        )}
+
+        {batchProgress && (
+          <div className="extraction-progress" role="status">
+            <div className="extraction-progress-head">
+              <Loader2 size={14} className="spin" />
+              <span>
+                Extracting recording {batchProgress.done} of {batchProgress.total}…
+              </span>
+            </div>
+            <div className="extraction-progress-track">
+              <div
+                className="extraction-progress-fill"
+                style={{
+                  width: `${Math.round((batchProgress.done / batchProgress.total) * 100)}%`,
+                }}
+              />
+            </div>
+            <button className="btn btn-secondary" onClick={onCancelExtraction}>
+              <X size={14} />
+              <span>Cancel — keep frames extracted so far</span>
+            </button>
+          </div>
+        )}
+
+        {/* Per-file failures. Never silent, never fatal to the successes. */}
+        {failedImports.length > 0 && (
+          <div className="sessions-warning" role="status">
+            <AlertTriangle size={14} />
+            <div>
+              <p>
+                {failedImports.length} recording
+                {failedImports.length === 1 ? '' : 's'} could not be imported:
+              </p>
+              <ul className="sessions-warning-list">
+                {failedImports.map((f) => (
+                  <li key={f.filename}>
+                    <strong>{f.filename}</strong> — {f.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
 
         {importError && (
           <div className="sessions-error" role="alert">

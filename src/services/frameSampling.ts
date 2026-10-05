@@ -87,9 +87,11 @@ export function deriveRecordingId(existingCount: number): string {
   return `rec-${String(Math.max(0, existingCount) + 1).padStart(4, '0')}`;
 }
 
-export function deriveRunId(existingCount: number): string {
+export function deriveRunId(existingCount: number, sequence = 0): string {
   const suffix = Date.now().toString(36).slice(-4);
-  return `run-${String(Math.max(0, existingCount) + 1).padStart(4, '0')}-${suffix}`;
+  // The sequence breaks ties when two runs start inside the same millisecond,
+  // which happens routinely during a bulk extraction batch.
+  return `run-${String(Math.max(0, existingCount) + 1).padStart(4, '0')}-${suffix}-${sequence}`;
 }
 
 /** Frame ids carry a random suffix so two runs over one recording never collide. */

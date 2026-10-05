@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   EncounterSample,
   FrameRecord,
@@ -23,6 +23,7 @@ import {
   Fingerprint,
   EyeOff,
   ScanText,
+  ChevronDown,
 } from 'lucide-react';
 
 interface EncounterGalleryProps {
@@ -109,6 +110,31 @@ export const EncounterGallery: React.FC<EncounterGalleryProps> = ({
   onLoadSampleBatch,
   onImportRecording,
 }) => {
+  /**
+   * Mobile filter disclosure (Slice 7 §10). Declared ABOVE the empty-corpus early
+   * return on purpose: the static hook-order guard requires every hook to sit above
+   * an early return, and this component has one.
+   *
+   * On a phone the five filter groups stack into ~24 pills and push the actual
+   * frame grid off-screen (measured: the grid began at ~91% of viewport height in
+   * screenshots/mobile-390-gallery-populated.png). Rather than shrink them, the
+   * toolbar collapses: only search/sort/actions stay, and the groups hide behind
+   * this disclosure. Desktop is unaffected — CSS decides, not this state.
+   */
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  /**
+   * How many filters are set to a NON-default value. Drives the "Filters (2)"
+   * badge so hidden state is still visible without opening the panel — hiding the
+   * groups must not silently hide the fact that the view is filtered.
+   */
+  const activeFilterCount =
+    (statusFilter !== 'all' ? 1 : 0) +
+    (platformFilter !== 'all' ? 1 : 0) +
+    (ugcTypeFilter !== 'all' ? 1 : 0) +
+    (dedupFilter !== 'all' ? 1 : 0) +
+    (hideSuppressedDuplicates ? 1 : 0);
+
   if (stats.total === 0) {
     return (
       <div style={{ padding: '2rem', height: '100%', overflowY: 'auto' }}>
@@ -149,7 +175,7 @@ export const EncounterGallery: React.FC<EncounterGalleryProps> = ({
           </div>
 
           {/* Sort Dropdown & Action CTA */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+          <div className="gallery-actions-row" style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
               <ArrowUpDown size={14} style={{ color: 'var(--text-dim)' }} />
               <select
@@ -181,6 +207,25 @@ export const EncounterGallery: React.FC<EncounterGalleryProps> = ({
                 ))}
               </select>
             </div>
+
+            {/* Mobile filter disclosure. Hidden on desktop by CSS, where the
+                groups below stay permanently expanded. */}
+            <button
+              className="gallery-filter-toggle"
+              onClick={() => setFiltersOpen((o) => !o)}
+              aria-expanded={filtersOpen}
+              aria-controls="gallery-filter-groups"
+            >
+              <Filter size={15} />
+              <span>Filters</span>
+              {activeFilterCount > 0 && (
+                <span className="gallery-filter-count">{activeFilterCount}</span>
+              )}
+              <ChevronDown
+                size={14}
+                className={filtersOpen ? 'gallery-filter-caret open' : 'gallery-filter-caret'}
+              />
+            </button>
 
             <button className="btn btn-primary btn-sm" onClick={onStartAnnotation}>
               <Play size={14} />
@@ -214,8 +259,17 @@ export const EncounterGallery: React.FC<EncounterGalleryProps> = ({
           </div>
         </div>
 
-        {/* Row 2: Status & Platform Filter Pills */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+        {/* Row 2: Status, Platform & Dedup filter pills.
+            Collapsible on phones — see §10 gallery chrome budget. On desktop CSS
+            keeps this permanently expanded and ignores `data-open`. */}
+        <div
+          className="gallery-filter-groups"
+          id="gallery-filter-groups"
+          data-open={filtersOpen ? 'true' : 'false'}
+        >
+
+        {/* Status & Platform Filter Pills */}
+        <div className="gallery-filter-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
           {/* Status Filter Group */}
           <div className="filter-group">
             <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -335,8 +389,12 @@ export const EncounterGallery: React.FC<EncounterGalleryProps> = ({
             </button>
           </div>
         </div>
+        </div>
 
-        {/* Row 3: Platform & Multi-Item Summary Strip */}
+        {/* Row 3: Platform & Multi-Item Summary Strip.
+            `.distribution-strip` is hidden on phones — it restates platform
+            counts a third time (§36 dashboard overload); the platform pills
+            already carry them. */}
         <div className="distribution-strip">
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-dim)' }}>
             <PieChart size={13} />

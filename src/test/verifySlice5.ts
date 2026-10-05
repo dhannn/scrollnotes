@@ -11,6 +11,7 @@ import {
   planExtraction,
   buildFrameFilename,
   deriveRecordingId,
+  deriveRunId,
   deriveFrameId,
   estimateDataUrlBytes,
   formatClock,
@@ -189,6 +190,58 @@ function runSlice5Verification() {
   console.assert(formatClock(523000) === '08:43', 'clock formatting matches the documented example');
   console.assert(formatClock(3661000) === '1:01:01', 'clock formatting handles hours');
   console.log('  pass: id derivation, size estimation, and clock formatting');
+
+  // --- Slice 8: bulk-ingestion id integrity ---------------------------------
+  // The bug these guard against was SILENT: recording ids came from
+  // `recordings.size` and sample ids from `encounters.length + 1`. In a bulk loop
+  // React has not re-rendered, so every iteration read the same stale count and
+  // minted the SAME id. Recordings then overwrote each other in IndexedDB
+  // (keyPath 'recordingId'), losing data with no error (AGENTS §21, §39).
+  const bulkRecordingIds = Array.from({ length: 25 }, () => deriveRecordingId(0));
+  console.assert(
+    new Set(bulkRecordingIds).size === 1,
+    'deriveRecordingId is a pure count->id function; it is the CALLER that must not reuse a stale count'
+  );
+
+  // The factory derives `sampleId` from prefix + counter ALONE, so the caller's
+  // counter is the ONLY thing guaranteeing uniqueness. Reusing a counter therefore
+  // produces duplicate ids — which is exactly why the hook allocates per frame
+  // instead of computing one counter per recording.
+  const frameA = makeFrame({ id: 'frame-a', filename: 'a.png' });
+  const frameB = makeFrame({ id: 'frame-b', filename: 'b.png' });
+  const recA = makeRecording({ recordingId: 'rec-0001', filename: 'a.mp4' });
+  const recB = makeRecording({ recordingId: 'rec-0002', filename: 'b.mp4' });
+
+  const dupA = createEncounterForFrame(frameA, { counter: 1, sampleIdPrefix: 'ugc', recordingId: recA.recordingId, timestampMs: 0 });
+  const dupB = createEncounterForFrame(frameB, { counter: 1, sampleIdPrefix: 'ugc', recordingId: recB.recordingId, timestampMs: 0 });
+  console.assert(
+    dupA.sampleId === dupB.sampleId,
+    'sample identity is derived from the counter alone, so a reused counter silently duplicates a sample'
+  );
+
+  // Allocating per frame (what the hook does) keeps ids unique across recordings.
+  let seq = 0;
+  const allocated = [
+    createEncounterForFrame(frameA, { counter: ++seq, sampleIdPrefix: 'ugc', recordingId: recA.recordingId, timestampMs: 0 }),
+    createEncounterForFrame(frameB, { counter: ++seq, sampleIdPrefix: 'ugc', recordingId: recB.recordingId, timestampMs: 0 }),
+  ];
+  console.assert(
+    allocated[0].sampleId !== allocated[1].sampleId,
+    'per-frame allocation keeps sample ids unique'
+  );
+  console.assert(
+    allocated[0].provenance.recordingId !== allocated[1].provenance.recordingId,
+    'provenance keeps each sample bound to its own recording'
+  );
+  console.log('  pass: bulk-ingestion sample identity guard (counters must be allocated per frame)');
+
+  // Run ids must stay distinct when several runs start in the same millisecond.
+  const runIds = [0, 1, 2, 3].map((seq) => deriveRunId(0, seq));
+  console.assert(
+    new Set(runIds).size === 4,
+    'run ids collide when a batch starts several runs in one millisecond'
+  );
+  console.log('  pass: run ids stay unique within a batch');
 
   console.log('\nALL SLICE 5 VERIFICATION TESTS PASSED SUCCESSFULLY!');
 }

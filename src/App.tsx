@@ -86,6 +86,8 @@ export function App() {
     extractionStatus,
     samplingConfig,
     importRecordingFile,
+    importRecordings,
+    runBulkExtraction,
     setSamplingConfig,
     previewSamplingGrid,
     runFrameExtraction,
@@ -438,6 +440,8 @@ export function App() {
             extractionStatus={extractionStatus}
             samplingConfig={samplingConfig}
             onImportRecording={importRecordingFile}
+            onImportRecordings={importRecordings}
+            onRunBulkExtraction={runBulkExtraction}
             onSetSamplingConfig={setSamplingConfig}
             onPreviewGrid={previewSamplingGrid}
             onRunExtraction={runFrameExtraction}
