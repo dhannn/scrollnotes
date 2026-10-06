@@ -28,6 +28,7 @@ export function App() {
     activeFrame,
     activeSampleId,
     activeIndex,
+    navCount,
     hasNext,
     hasPrev,
     stats,
@@ -517,7 +518,7 @@ export function App() {
             <AnnotationCockpit
               encounter={activeEncounter}
               frame={activeFrame}
-              totalEncounters={encounters.length}
+              totalEncounters={navCount}
               currentIndex={activeIndex}
               hasNext={hasNext}
               hasPrev={hasPrev}

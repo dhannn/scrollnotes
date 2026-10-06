@@ -111,6 +111,7 @@ export function useFieldSession() {
   const [frames, setFrames] = useState<Map<string, FrameRecord>>(new Map());
   const [datasetInfo, setDatasetInfo] = useState<DatasetInfo>(DEFAULT_DATASET_INFO);
   const [activeSampleId, setActiveSampleId] = useState<string | null>(null);
+  const [navSnapshot, setNavSnapshot] = useState<string[] | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [currentView, setCurrentView] = useState<GalleryView>('gallery');
 
@@ -460,42 +461,60 @@ export function useFieldSession() {
     hideSuppressedDuplicates,
   ]);
 
+  // Navigation list. When a sample is opened from the gallery, the visible (filtered)
+  // order is snapshotted so next/prev/save-and-next walk exactly what the researcher
+  // filtered to. A snapshot (rather than the live filter) keeps the list stable when
+  // saving changes a sample's status and would otherwise drop it from the filter.
+  const navList = useMemo(() => {
+    if (navSnapshot && activeSampleId && navSnapshot.includes(activeSampleId)) {
+      const byId = new Map(encounters.map((e) => [e.sampleId, e]));
+      return navSnapshot
+        .map((id) => byId.get(id))
+        .filter((e): e is EncounterSample => !!e);
+    }
+    return encounters;
+  }, [encounters, navSnapshot, activeSampleId]);
+
   // Navigation indices
   const activeIndex = useMemo(() => {
     if (!activeSampleId) return -1;
-    return encounters.findIndex((e) => e.sampleId === activeSampleId);
-  }, [encounters, activeSampleId]);
+    return navList.findIndex((e) => e.sampleId === activeSampleId);
+  }, [navList, activeSampleId]);
 
-  const hasNext = activeIndex >= 0 && activeIndex < encounters.length - 1;
+  const hasNext = activeIndex >= 0 && activeIndex < navList.length - 1;
   const hasPrev = activeIndex > 0;
 
   const goToNext = useCallback(() => {
-    if (activeIndex >= 0 && activeIndex < encounters.length - 1) {
-      setActiveSampleId(encounters[activeIndex + 1].sampleId);
+    if (activeIndex >= 0 && activeIndex < navList.length - 1) {
+      setActiveSampleId(navList[activeIndex + 1].sampleId);
     }
-  }, [activeIndex, encounters]);
+  }, [activeIndex, navList]);
 
   const goToPrev = useCallback(() => {
     if (activeIndex > 0) {
-      setActiveSampleId(encounters[activeIndex - 1].sampleId);
+      setActiveSampleId(navList[activeIndex - 1].sampleId);
     }
-  }, [activeIndex, encounters]);
+  }, [activeIndex, navList]);
 
-  const openSampleInCockpit = useCallback((sampleId: string) => {
-    setActiveSampleId(sampleId);
-    setCurrentView('cockpit');
-  }, []);
+  const openSampleInCockpit = useCallback(
+    (sampleId: string) => {
+      setNavSnapshot(filteredEncounters.map((e) => e.sampleId));
+      setActiveSampleId(sampleId);
+      setCurrentView('cockpit');
+    },
+    [filteredEncounters]
+  );
 
   // --- Slice 7 §8: skip-to-next-unannotated -----------------------------
   // Step 1 §8 promised this as the single biggest throughput win at 200+ samples:
   // walking the raw list means re-reading every completed sample on the way through.
   const unannotatedIndexes = useMemo(
     () =>
-      encounters
+      navList
         .map((e, i) => ({ e, i }))
         .filter(({ e }) => e.status === 'pending' || e.status === 'skipped')
         .map(({ i }) => i),
-    [encounters]
+    [navList]
   );
 
   const nextUnannotatedIndex = useMemo(() => {
@@ -512,23 +531,23 @@ export function useFieldSession() {
 
   const goToNextUnannotated = useCallback(() => {
     if (nextUnannotatedIndex === null) return;
-    setActiveSampleId(encounters[nextUnannotatedIndex].sampleId);
+    setActiveSampleId(navList[nextUnannotatedIndex].sampleId);
     setCurrentView('cockpit');
-  }, [nextUnannotatedIndex, encounters]);
+  }, [nextUnannotatedIndex, navList]);
 
   const goToPrevUnannotated = useCallback(() => {
     if (prevUnannotatedIndex === null) return;
-    setActiveSampleId(encounters[prevUnannotatedIndex].sampleId);
+    setActiveSampleId(navList[prevUnannotatedIndex].sampleId);
     setCurrentView('cockpit');
-  }, [prevUnannotatedIndex, encounters]);
+  }, [prevUnannotatedIndex, navList]);
 
   /** Jump straight to the first outstanding sample, used by the lifecycle CTA. */
   const goToFirstUnannotated = useCallback(() => {
     if (unannotatedIndexes.length === 0) return false;
-    setActiveSampleId(encounters[unannotatedIndexes[0]].sampleId);
+    setActiveSampleId(navList[unannotatedIndexes[0]].sampleId);
     setCurrentView('cockpit');
     return true;
-  }, [unannotatedIndexes, encounters]);
+  }, [unannotatedIndexes, navList]);
 
   // Update encounter in state & IndexedDB
   const updateEncounter = useCallback(
@@ -583,12 +602,12 @@ export function useFieldSession() {
 
       await updateEncounter(updatedEncounter);
 
-      const idx = encounters.findIndex((e) => e.sampleId === sampleId);
-      if (idx >= 0 && idx < encounters.length - 1) {
-        setActiveSampleId(encounters[idx + 1].sampleId);
+      const idx = navList.findIndex((e) => e.sampleId === sampleId);
+      if (idx >= 0 && idx < navList.length - 1) {
+        setActiveSampleId(navList[idx + 1].sampleId);
       }
     },
-    [encounters, updateEncounter]
+    [encounters, navList, updateEncounter]
   );
 
   // Quick mark status
@@ -606,13 +625,13 @@ export function useFieldSession() {
       await updateEncounter(updatedEncounter);
 
       if (advance) {
-        const idx = encounters.findIndex((e) => e.sampleId === sampleId);
-        if (idx >= 0 && idx < encounters.length - 1) {
-          setActiveSampleId(encounters[idx + 1].sampleId);
+        const idx = navList.findIndex((e) => e.sampleId === sampleId);
+        if (idx >= 0 && idx < navList.length - 1) {
+          setActiveSampleId(navList[idx + 1].sampleId);
         }
       }
     },
-    [encounters, updateEncounter]
+    [encounters, navList, updateEncounter]
   );
 
   // Ingest Image Files (secondary path — pre-extracted frames, no recording provenance)
@@ -1396,6 +1415,7 @@ export function useFieldSession() {
     activeFrame,
     activeSampleId,
     activeIndex,
+    navCount: navList.length,
     hasNext,
     hasPrev,
     stats,
