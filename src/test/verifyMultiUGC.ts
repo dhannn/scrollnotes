@@ -1,3 +1,4 @@
+import { isItemComplete } from '../services/itemCompletion';
 import { generateFieldworkSampleBatch } from '../services/sampleData';
 import {
   EncounterSample,
@@ -61,7 +62,7 @@ class MockMultiUGCSession {
     const idx = this.encounters.findIndex((e) => e.sampleId === sampleId);
     if (idx === -1) throw new Error(`Sample ${sampleId} not found`);
 
-    const hasAnyContent = fields.items.some((it) => it.content.trim().length > 0);
+    const hasAnyContent = fields.items.some(isItemComplete);
 
     this.encounters[idx] = {
       ...this.encounters[idx],

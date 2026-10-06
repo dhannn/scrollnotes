@@ -368,3 +368,19 @@ export async function clearEntireDatabase(): Promise<void> {
   await db.clear('recordings');
   await db.clear('extraction_runs');
 }
+
+/**
+ * Metadata-only frame listing. Iterates with a cursor and drops `dataUrl` from
+ * each record immediately, so the (large) base64 payloads are never all held in
+ * memory at once. Read-only: the stored records are not touched.
+ */
+export async function getAllFrameMetas(): Promise<FrameRecord[]> {
+  const db = await getDB();
+  const metas: FrameRecord[] = [];
+  let cursor = await db.transaction('frames').store.openCursor();
+  while (cursor) {
+    metas.push({ ...cursor.value, dataUrl: '' });
+    cursor = await cursor.continue();
+  }
+  return metas;
+}

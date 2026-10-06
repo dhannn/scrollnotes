@@ -130,6 +130,7 @@ export const GroundTruthForm: React.FC<GroundTruthFormProps> = ({
   };
 
   const firstInputRef = useRef<HTMLTextAreaElement>(null);
+  const firstAuthorRef = useRef<HTMLInputElement>(null);
 
   const ocrRunning =
     ocrStatus.phase === 'running' && ocrStatus.frameId === encounter.frameId;
@@ -167,7 +168,8 @@ export const GroundTruthForm: React.FC<GroundTruthFormProps> = ({
     setSaveStatus('saved');
 
     setTimeout(() => {
-      firstInputRef.current?.focus();
+      // Author comes first in the form; fall back to the content textarea when the item has no author field.
+      (firstAuthorRef.current ?? firstInputRef.current)?.focus();
     }, 50);
   }, [encounter.sampleId, encounter.items, encounter.platform, encounter.metadata]);
 
@@ -202,7 +204,12 @@ export const GroundTruthForm: React.FC<GroundTruthFormProps> = ({
     setSaveStatus('idle');
 
     setTimeout(() => {
+      const authors = document.querySelectorAll<HTMLInputElement>('input[data-item-author]');
       const textareas = document.querySelectorAll<HTMLTextAreaElement>('.item-content-textarea');
+      if (newItem.hasAuthor && authors.length === textareas.length) {
+        authors[authors.length - 1].focus();
+        return;
+      }
       if (textareas.length > 0) {
         textareas[textareas.length - 1].focus();
       }
@@ -446,25 +453,6 @@ export const GroundTruthForm: React.FC<GroundTruthFormProps> = ({
                 </div>
               </div>
 
-              {/* Item Verbatim Content */}
-              <div className="form-group" style={{ marginTop: '0.5rem' }}>
-                <div className="form-label-row">
-                  <label className="form-label" style={{ fontSize: '0.75rem' }}>
-                    <Type size={12} />
-                    <span>Verbatim UGC Text</span>
-                  </label>
-                  <span className="form-helper" style={{ fontSize: '0.68rem' }}>Exact transcription</span>
-                </div>
-                <textarea
-                  ref={index === 0 ? firstInputRef : undefined}
-                  className={`form-textarea item-content-textarea ${isMonospace ? 'is-mono' : ''}`}
-                  placeholder={`Transcribe exact content for item #${index + 1}...`}
-                  value={item.content}
-                  onChange={(e) => updateItemField(index, 'content', e.target.value)}
-                  rows={items.length > 1 ? 3 : 4}
-                />
-              </div>
-
               {/* Item Author Handle */}
               {item.hasAuthor && (
                 <div className="form-group" style={{ marginTop: '0.4rem' }}>
@@ -485,12 +473,33 @@ export const GroundTruthForm: React.FC<GroundTruthFormProps> = ({
                   <input
                     type="text"
                     className="form-input"
+                    ref={index === 0 ? firstAuthorRef : undefined}
+                    data-item-author
                     placeholder="e.g. @username or Name"
                     value={item.author}
                     onChange={(e) => updateItemField(index, 'author', e.target.value)}
                   />
                 </div>
               )}
+
+              {/* Item Verbatim Content */}
+              <div className="form-group" style={{ marginTop: '0.5rem' }}>
+                <div className="form-label-row">
+                  <label className="form-label" style={{ fontSize: '0.75rem' }}>
+                    <Type size={12} />
+                    <span>Verbatim UGC Text</span>
+                  </label>
+                  <span className="form-helper" style={{ fontSize: '0.68rem' }}>Exact transcription</span>
+                </div>
+                <textarea
+                  ref={index === 0 ? firstInputRef : undefined}
+                  className={`form-textarea item-content-textarea ${isMonospace ? 'is-mono' : ''}`}
+                  placeholder={`Transcribe exact content for item #${index + 1}...`}
+                  value={item.content}
+                  onChange={(e) => updateItemField(index, 'content', e.target.value)}
+                  rows={items.length > 1 ? 3 : 4}
+                />
+              </div>
 
               {/* Item Salient Media Description (shown if item hasMedia is active) */}
               {item.hasMedia && (

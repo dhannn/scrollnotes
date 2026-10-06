@@ -1,4 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useFrameThumb } from '../hooks/useFrameThumb';
+
+const DedupThumb: React.FC<{ frameId: string; alt: string }> = ({ frameId, alt }) => {
+  const src = useFrameThumb(frameId);
+  return src ? <img src={src} alt={alt} className="dedup-frame-thumb" /> : <div className="dedup-frame-missing">…</div>;
+};
 import {
   Fingerprint,
   Play,
@@ -369,12 +375,7 @@ export const DeduplicationReview: React.FC<DeduplicationReviewProps> = ({
                       title={`Open ${sampleId} in the annotation cockpit`}
                     >
                       {frame ? (
-                        <img
-                          src={frame.dataUrl}
-                          alt={sampleId}
-                          className="dedup-frame-thumb"
-                          loading="lazy"
-                        />
+                        <DedupThumb frameId={frame.id} alt={sampleId} />
                       ) : (
                         <div className="dedup-frame-missing">No image</div>
                       )}

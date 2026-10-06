@@ -7,6 +7,7 @@ import {
   selectExportableSamples,
   type ExportBundle,
 } from '../services/export';
+import { hydrateFrame } from '../services/frameImages';
 import { validateForExport } from '../services/exportValidation';
 import { createZip, downloadBytes } from '../services/zip';
 import type {
@@ -107,10 +108,14 @@ export function useCorpusExport(input: UseCorpusExportInput) {
         const total = exportableCount;
         setProgressLabel(`Preparing ${total} sample${total === 1 ? '' : 's'}...`);
 
+        // Frames in state are metadata-only; pull pixels from IndexedDB just for the build.
+        const hydrated = new Map<string, FrameRecord>();
+        for (const [id, meta] of input.frames) hydrated.set(id, await hydrateFrame(meta));
+
         const bundle = buildExportBundle({
           dataset: input.dataset,
           encounters: input.encounters,
-          frames: input.frames,
+          frames: hydrated,
           ocrArtifacts: input.ocrArtifacts,
           dedupConfig: input.dedupConfig,
           dedupRecords: input.dedupRecords,

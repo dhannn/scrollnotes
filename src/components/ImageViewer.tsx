@@ -119,7 +119,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
         onMouseLeave={handleMouseUp}
         style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default' }}
       >
-        {frame ? (
+        {frame && frame.dataUrl ? (
           <img
             src={frame.dataUrl}
             alt={sampleId}
@@ -132,7 +132,7 @@ export const ImageViewer: React.FC<ImageViewerProps> = ({
           />
         ) : (
           <div style={{ color: 'var(--text-dim)', textAlign: 'center' }}>
-            No visual frame available
+            {frame ? 'Loading frame…' : 'No visual frame available'}
           </div>
         )}
       </div>

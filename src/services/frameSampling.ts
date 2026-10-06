@@ -294,8 +294,9 @@ export async function probeRecording(
   file: File
 ): Promise<{ durationMs?: number; width: number; height: number }> {
   const url = URL.createObjectURL(file);
+  let video: HTMLVideoElement | undefined;
   try {
-    const video = await loadVideoElement(url);
+    video = await loadVideoElement(url);
     const raw = video.duration;
     const usable = Number.isFinite(raw) && raw > 0 ? raw : undefined;
     return {
@@ -304,6 +305,7 @@ export async function probeRecording(
       height: video.videoHeight || 0,
     };
   } finally {
+    releaseVideo(video);
     URL.revokeObjectURL(url);
   }
 }
@@ -377,9 +379,11 @@ export async function extractFrames(
   const frames: FrameRecord[] = [];
   const timestampsMs: number[] = [];
   let cancelled = false;
+  let video: HTMLVideoElement | undefined;
+  let canvas: HTMLCanvasElement | undefined;
 
   try {
-    const video = await loadVideoElement(url);
+    video = await loadVideoElement(url);
     const width = video.videoWidth || 0;
     const height = video.videoHeight || 0;
 
@@ -396,7 +400,7 @@ export async function extractFrames(
       return { frames, timestampsMs, warnings, cancelled };
     }
 
-    const canvas = document.createElement('canvas');
+    canvas = document.createElement('canvas');
     canvas.width = width || 1920;
     canvas.height = height || 1080;
     const ctx = canvas.getContext('2d');
@@ -463,6 +467,17 @@ export async function extractFrames(
     }
     throw new Error(`This recording could not be read in your browser. ${DECODE_ERROR_MESSAGE}`);
   } finally {
+    if (canvas) {
+      canvas.width = 0;
+      canvas.height = 0;
+    }
+    releaseVideo(video);
     URL.revokeObjectURL(url);
   }
+}
+/** Drop the decoder's hold on the media so the buffers can be reclaimed. */
+function releaseVideo(video: HTMLVideoElement | undefined): void {
+  if (!video) return;
+  video.removeAttribute('src');
+  video.load();
 }

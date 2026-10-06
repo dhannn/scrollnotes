@@ -25,7 +25,7 @@ import {
 } from '../types/schema';
 import {
   getAllEncounters,
-  getAllFrames,
+  getAllFrameMetas,
   saveEncounter,
   saveFrame,
   getDatasetInfo,
@@ -49,6 +49,14 @@ import { generateFieldworkSampleBatch } from '../services/sampleData';
 import { runOcr, buildOcrArtifact, terminateOcrWorker } from '../services/ocr';
 import { computeFrameHash, groupBySimilarity } from '../services/deduplication';
 import { createEncounterForFrame } from '../services/encounters';
+import { isItemComplete } from '../services/itemCompletion';
+import {
+  stripFrame,
+  hydrateFrame,
+  getFrameDataUrl,
+  prefetchFrames,
+  clearFrameImageCaches,
+} from '../services/frameImages';
 import {
   extractFrames,
   probeRecording,
@@ -190,6 +198,7 @@ export function useFieldSession() {
   const refreshFromDB = useCallback(async () => {
     try {
       setIsLoading(true);
+      clearFrameImageCaches();
       const [
         savedEncounters,
         savedFrames,
@@ -201,7 +210,7 @@ export function useFieldSession() {
         savedRuns,
       ] = await Promise.all([
         getAllEncounters(),
-        getAllFrames(),
+        getAllFrameMetas(),
         getDatasetInfo(),
         getAllOcrArtifacts(),
         getAllDedupRecords(),
@@ -260,10 +269,46 @@ export function useFieldSession() {
     return encounters.find((e) => e.sampleId === activeSampleId) || null;
   }, [encounters, activeSampleId]);
 
+  // Only the active frame's pixels live in React state; neighbours are warmed in a
+  // small LRU (services/frameImages). Records in `frames` are metadata-only.
+  const activeFrameId = activeEncounter?.frameId ?? null;
+  const [activeImage, setActiveImage] = useState<{ id: string; dataUrl: string } | null>(null);
+
+  useEffect(() => {
+    if (!activeFrameId) {
+      setActiveImage(null);
+      return;
+    }
+    let cancelled = false;
+    void getFrameDataUrl(activeFrameId)
+      .then((dataUrl) => {
+        if (!cancelled) setActiveImage(dataUrl ? { id: activeFrameId, dataUrl } : null);
+      })
+      .catch(() => {
+        if (!cancelled) setActiveImage(null);
+      });
+    const idx = encounters.findIndex((e) => e.sampleId === activeSampleId);
+    if (idx >= 0) {
+      prefetchFrames(
+        [encounters[idx + 1], encounters[idx - 1]]
+          .filter((e): e is EncounterSample => !!e)
+          .map((e) => e.frameId)
+      );
+    }
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFrameId, activeSampleId]);
+
   const activeFrame = useMemo(() => {
     if (!activeEncounter) return null;
-    return frames.get(activeEncounter.frameId) || null;
-  }, [activeEncounter, frames]);
+    const meta = frames.get(activeEncounter.frameId);
+    if (!meta) return null;
+    return activeImage && activeImage.id === meta.id
+      ? { ...meta, dataUrl: activeImage.dataUrl }
+      : meta;
+  }, [activeEncounter, frames, activeImage]);
 
   // Session Statistics & Platform Distribution
   const stats: SessionStats = useMemo(() => {
@@ -520,7 +565,7 @@ export function useFieldSession() {
       const current = encounters.find((e) => e.sampleId === sampleId);
       if (!current) return;
 
-      const hasAnyContent = fields.items.some((it) => it.content.trim().length > 0);
+      const hasAnyContent = fields.items.some(isItemComplete);
 
       const updatedEncounter: EncounterSample = {
         ...current,
@@ -609,7 +654,7 @@ export function useFieldSession() {
         await saveFrame(frameRecord);
         await saveEncounter(encounterRecord);
 
-        newFrames.push(frameRecord);
+        newFrames.push(stripFrame(frameRecord));
         newEncounters.push(encounterRecord);
       }
 
@@ -845,7 +890,7 @@ export function useFieldSession() {
           await saveFrame(frame);
           await saveEncounter(encounterRecord);
 
-          newFrames.push(frame);
+          newFrames.push(stripFrame(frame));
           newEncounters.push(encounterRecord);
 
           setExtractionStatus((prev) => ({ ...prev, processed: i + 1 }));
@@ -996,7 +1041,8 @@ export function useFieldSession() {
     }
 
     const frameMap = new Map<string, FrameRecord>();
-    sampleFrames.forEach((f) => frameMap.set(f.id, f));
+    clearFrameImageCaches();
+    sampleFrames.forEach((f) => frameMap.set(f.id, stripFrame(f)));
 
     setFrames(frameMap);
     setEncounters(sampleEncounters);
@@ -1023,6 +1069,7 @@ export function useFieldSession() {
     await clearEntireDatabase();
     await terminateOcrWorker();
     setEncounters([]);
+    clearFrameImageCaches();
     setFrames(new Map());
     setActiveSampleId(null);
     setOcrArtifacts(new Map());
@@ -1061,8 +1108,8 @@ export function useFieldSession() {
 
   const runOcrForFrame = useCallback(
     async (frameId: string): Promise<OcrArtifact | null> => {
-      const frame = frames.get(frameId);
-      if (!frame) {
+      const meta = frames.get(frameId);
+      if (!meta) {
         setOcrStatus({
           frameId,
           phase: 'error',
@@ -1079,6 +1126,8 @@ export function useFieldSession() {
       });
 
       try {
+        const frame = await hydrateFrame(meta);
+        if (!frame.dataUrl) throw new Error('Frame image is no longer stored.');
         const result = await runOcr(frame, {
           onProgress: (p) =>
             setOcrStatus({
@@ -1174,7 +1223,7 @@ export function useFieldSession() {
       for (let i = 0; i < frameList.length; i++) {
         const frame = frameList[i];
         const previous = dedupRecords.get(frame.id);
-        const { hash } = await computeFrameHash(frame, { algorithm, hashSize });
+        const { hash } = await computeFrameHash(await hydrateFrame(frame), { algorithm, hashSize });
 
         const record: DedupRecord = {
           frameId: frame.id,

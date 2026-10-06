@@ -6,6 +6,7 @@ import {
 } from '../types/schema';
 import { CheckCircle2, Clock, XCircle, SkipForward, Flag, FileText, Image as ImageIcon, Layers, Crown, AlertTriangle } from 'lucide-react';
 import { QUALITY_FLAG_LABELS } from '../types/schema';
+import { useFrameThumb } from '../hooks/useFrameThumb';
 
 interface EncounterCardProps {
   encounter: EncounterSample;
@@ -24,6 +25,7 @@ export const EncounterCard: React.FC<EncounterCardProps> = ({
   isActive,
   onSelect,
 }) => {
+  const thumbSrc = useFrameThumb(frame?.id);
   const primaryItem = encounter.items[0];
   const hasText = primaryItem?.content && primaryItem.content.trim().length > 0;
   const isFlagged = encounter.metadata?.isFlaggedForReview;
@@ -79,16 +81,16 @@ export const EncounterCard: React.FC<EncounterCardProps> = ({
       onClick={() => onSelect(encounter.sampleId)}
     >
       <div className="card-image-wrap">
-        {frame ? (
+        {frame && thumbSrc ? (
           <img
-            src={frame.dataUrl}
+            src={thumbSrc}
             alt={encounter.sampleId}
             className="card-image"
             loading="lazy"
           />
         ) : (
           <div style={{ color: 'var(--text-dim)', fontSize: '0.75rem' }}>
-            No image data
+            {frame ? 'Loading…' : 'No image data'}
           </div>
         )}
 

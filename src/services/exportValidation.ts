@@ -1,4 +1,5 @@
 import { SCHEMA_VERSION } from '../types/schema';
+import { isItemComplete } from './itemCompletion';
 import type {
   EncounterSample,
   DatasetInfo,
@@ -43,11 +44,11 @@ function hasContent(value: string | undefined | null): boolean {
 }
 
 /**
- * An item counts as real ground truth when it carries transcribed content. An author alone
+ * An item counts as real ground truth when it carries transcribed content. An author alone (media-only items count via isItemComplete)
  * is not enough: the gold standard for this dataset is the content (section 13).
  */
-function itemHasContent(item: { content?: string }): boolean {
-  return hasContent(item.content);
+function itemHasContent(item: { content?: string; hasMedia?: boolean; mediaDescription?: string }): boolean {
+  return isItemComplete(item);
 }
 
 /** Cap the ids attached to a check so a broken corpus cannot render a huge list. */
@@ -135,7 +136,7 @@ export function validateForExport(input: ValidationInput): ExportValidation {
       id: 'ground-truth',
       label: 'Ground truths complete',
       severity: 'fail',
-      detail: `Every exported sample needs at least one UGC item with transcribed content: ${parts.join(', ')}. Annotate them, or mark them rejected so they are excluded.`,
+      detail: `Every exported sample needs at least one UGC item with transcribed content (or, for a media-only item, a media description): ${parts.join(', ')}. Annotate them, or mark them rejected so they are excluded.`,
       sampleIds: limitIds([...noItems, ...emptyContent]),
     });
   } else {
@@ -143,7 +144,7 @@ export function validateForExport(input: ValidationInput): ExportValidation {
       id: 'ground-truth',
       label: 'Ground truths complete',
       severity: 'pass',
-      detail: `${exportable.length}/${exportable.length} ground truths contain transcribed content.`,
+      detail: `${exportable.length}/${exportable.length} ground truths contain transcribed content or a media description.`,
     });
   }
 // --- 4. Platform verified ----------------------------------------------

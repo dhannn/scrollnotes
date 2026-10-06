@@ -113,7 +113,11 @@ async function rasteriseFrame(frame: FrameRecord): Promise<string> {
   ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, width, height);
   ctx.drawImage(img, 0, 0, width, height);
-  return canvas.toDataURL('image/png');
+  const out = canvas.toDataURL('image/png');
+  canvas.width = 0;
+  canvas.height = 0;
+  img.src = '';
+  return out;
 }
 
 /** Run OCR on a frame and return a structured, provenance-carrying result. */

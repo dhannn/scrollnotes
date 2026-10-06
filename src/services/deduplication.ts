@@ -276,6 +276,9 @@ async function framePixels(
   ctx.fillRect(0, 0, width, height);
   ctx.drawImage(img, 0, 0, width, height);
   const { data } = ctx.getImageData(0, 0, width, height);
+  canvas.width = 0;
+  canvas.height = 0;
+  img.src = '';
   return { data, width, height };
 }
 
