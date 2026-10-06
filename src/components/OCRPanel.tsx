@@ -12,6 +12,7 @@ import {
   OcrInsertMode,
   OcrStatus,
 } from '../types/schema';
+import { normalizeRole } from '../types/schema';
 import { needsOcrInsertConfirmation } from '../services/ocrInsert';
 
 interface OCRPanelProps {
@@ -198,7 +199,7 @@ export const OCRPanel: React.FC<OCRPanelProps> = ({
                         }}
                         title={`Insert OCR into item #${index + 1}`}
                       >
-                        #{index + 1} {item.role}
+                        #{index + 1} {normalizeRole(item.role)}
                       </button>
                     ))}
                   </div>

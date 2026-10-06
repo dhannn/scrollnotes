@@ -321,7 +321,6 @@ export function generateFieldworkSampleBatch(): SampleBundle {
     items: cfg.items,
     status: cfg.status,
     metadata: {
-      ugcType: 'original-post',
       textDensity: cfg.items.length > 1 ? 'high' : 'medium',
       visualDensity: 'medium',
       isFlaggedForReview: false,

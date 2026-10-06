@@ -4,7 +4,7 @@ import {
   FrameRecord,
   SessionStats,
   Platform,
-  UGCType,
+  GroundTruthItemRole,
   DedupRecord,
   DedupFilterOption,
 } from '../types/schema';
@@ -33,7 +33,7 @@ interface EncounterGalleryProps {
   searchQuery: string;
   statusFilter: StatusFilterOption;
   platformFilter: 'all' | Platform;
-  ugcTypeFilter: 'all' | UGCType;
+  roleFilter: 'all' | GroundTruthItemRole;
   sortOption: SortOption;
   dedupFilter: DedupFilterOption;
   hideSuppressedDuplicates: boolean;
@@ -44,7 +44,7 @@ interface EncounterGalleryProps {
   onSearchChange: (q: string) => void;
   onStatusFilterChange: (status: StatusFilterOption) => void;
   onPlatformFilterChange: (platform: 'all' | Platform) => void;
-  onUgcTypeFilterChange: (ugcType: 'all' | UGCType) => void;
+  onRoleFilterChange: (role: 'all' | GroundTruthItemRole) => void;
   onSortChange: (sort: SortOption) => void;
   onDedupFilterChange: (filter: DedupFilterOption) => void;
   onHideSuppressedChange: (hide: boolean) => void;
@@ -70,14 +70,12 @@ const PLATFORMS: { id: 'all' | Platform; label: string }[] = [
   { id: 'other', label: 'Other' },
 ];
 
-const UGC_TYPES: { id: 'all' | UGCType; label: string }[] = [
-  { id: 'all', label: 'All Types' },
-  { id: 'original-post', label: 'Post' },
-  { id: 'comment', label: 'Comment' },
+const ROLE_FILTERS: { id: 'all' | GroundTruthItemRole; label: string }[] = [
+  { id: 'all', label: 'All Roles' },
+  { id: 'post', label: 'Post' },
   { id: 'reply', label: 'Reply' },
-  { id: 'story-reel', label: 'Story/Reel' },
-  { id: 'quoted-post', label: 'Quote' },
-  { id: 'standalone', label: 'Standalone' },
+  { id: 'quoted-card', label: 'Quoted card' },
+  { id: 'feed-preview', label: 'Feed preview' },
 ];
 
 export const EncounterGallery: React.FC<EncounterGalleryProps> = ({
@@ -87,7 +85,7 @@ export const EncounterGallery: React.FC<EncounterGalleryProps> = ({
   searchQuery,
   statusFilter,
   platformFilter,
-  ugcTypeFilter,
+  roleFilter,
   sortOption,
   dedupFilter,
   hideSuppressedDuplicates,
@@ -98,7 +96,7 @@ export const EncounterGallery: React.FC<EncounterGalleryProps> = ({
   onSearchChange,
   onStatusFilterChange,
   onPlatformFilterChange,
-  onUgcTypeFilterChange,
+  onRoleFilterChange,
   onSortChange,
   onDedupFilterChange,
   onHideSuppressedChange,
@@ -131,7 +129,7 @@ export const EncounterGallery: React.FC<EncounterGalleryProps> = ({
   const activeFilterCount =
     (statusFilter !== 'all' ? 1 : 0) +
     (platformFilter !== 'all' ? 1 : 0) +
-    (ugcTypeFilter !== 'all' ? 1 : 0) +
+    (roleFilter !== 'all' ? 1 : 0) +
     (dedupFilter !== 'all' ? 1 : 0) +
     (hideSuppressedDuplicates ? 1 : 0);
 
@@ -197,10 +195,10 @@ export const EncounterGallery: React.FC<EncounterGalleryProps> = ({
               <select
                 className="form-input"
                 style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem', width: 'auto' }}
-                value={ugcTypeFilter}
-                onChange={(e) => onUgcTypeFilterChange(e.target.value as 'all' | UGCType)}
+                value={roleFilter}
+                onChange={(e) => onRoleFilterChange(e.target.value as 'all' | GroundTruthItemRole)}
               >
-                {UGC_TYPES.map((t) => (
+                {ROLE_FILTERS.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.label}
                   </option>
@@ -434,7 +432,7 @@ export const EncounterGallery: React.FC<EncounterGalleryProps> = ({
                 onSearchChange('');
                 onStatusFilterChange('all');
                 onPlatformFilterChange('all');
-                onUgcTypeFilterChange('all');
+                onRoleFilterChange('all');
                 onDedupFilterChange('all');
                 onHideSuppressedChange(false);
               }}

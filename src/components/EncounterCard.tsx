@@ -5,7 +5,7 @@ import {
   DedupRole,
 } from '../types/schema';
 import { CheckCircle2, Clock, XCircle, SkipForward, Flag, FileText, Image as ImageIcon, Layers, Crown, AlertTriangle } from 'lucide-react';
-import { QUALITY_FLAG_LABELS } from '../types/schema';
+import { ITEM_ROLE_LABELS, normalizeRole, QUALITY_FLAG_LABELS } from '../types/schema';
 import { useFrameThumb } from '../hooks/useFrameThumb';
 
 interface EncounterCardProps {
@@ -146,7 +146,7 @@ export const EncounterCard: React.FC<EncounterCardProps> = ({
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span className="card-sample-id">{encounter.sampleId}</span>
           <span className="card-ugc-type-pill">
-            {primaryItem?.role ? primaryItem.role : (encounter.metadata?.ugcType || 'post')}
+            {ITEM_ROLE_LABELS[normalizeRole(primaryItem?.role)]}
           </span>
         </div>
 
@@ -156,7 +156,7 @@ export const EncounterCard: React.FC<EncounterCardProps> = ({
 
         {secondaryItemsCount > 0 && (
           <div className="card-secondary-preview">
-            <span>+{secondaryItemsCount} more visible {secondaryItemsCount === 1 ? 'item' : 'items'} (e.g. {encounter.items[1]?.role || 'reply'})</span>
+            <span>+{secondaryItemsCount} more visible {secondaryItemsCount === 1 ? 'item' : 'items'} (e.g. {ITEM_ROLE_LABELS[normalizeRole(encounter.items[1]?.role)].toLowerCase()})</span>
           </div>
         )}
 

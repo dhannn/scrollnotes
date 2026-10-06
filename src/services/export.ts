@@ -1,4 +1,4 @@
-import { SCHEMA_VERSION, EXPORT_FILES } from '../types/schema';
+import { SCHEMA_VERSION, EXPORT_FILES, normalizeRole } from '../types/schema';
 import type {
   DatasetInfo,
   EncounterSample,
@@ -79,9 +79,11 @@ export function buildAnnotationRecord(
     datasetVersion: dataset.version,
     platform: encounter.platform,
     image: imagePath,
-    items: encounter.items,
+    items: encounter.items.map((item) => ({ ...item, role: normalizeRole(item.role) })),
     ...(encounter.context ? { context: encounter.context } : {}),
-    ...(encounter.metadata ? { metadata: encounter.metadata } : {}),
+    ...(encounter.metadata
+      ? { metadata: (({ ugcType: _legacy, ...rest }) => rest)(encounter.metadata) }
+      : {}),
     provenance: {
       ...(encounter.provenance.recordingId
         ? { recordingId: encounter.provenance.recordingId }
@@ -170,7 +172,7 @@ export function buildAnnotationsCsv(records: ExportedAnnotation[]): string {
     'author',
     'mediaDescription',
     'itemCount',
-    'ugcType',
+    'role',
     'textDensity',
     'visualDensity',
     'qualityFlags',
@@ -189,7 +191,7 @@ export function buildAnnotationsCsv(records: ExportedAnnotation[]): string {
       primary?.author ?? '',
       primary?.mediaDescription ?? '',
       record.items.length,
-      record.metadata?.ugcType ?? '',
+      primary ? normalizeRole(primary.role) : '',
       record.metadata?.textDensity ?? '',
       record.metadata?.visualDensity ?? '',
       record.metadata?.qualityFlags ?? [],
@@ -404,7 +406,7 @@ export function buildReadme(manifest: ExportManifest): string {
     '  "items": [',
     '    { "role": "post", "content": "...", "author": "...", "mediaDescription": "..." }',
     '  ],',
-    '  "metadata": { "ugcType": "original-post", "textDensity": "medium" },',
+    '  "metadata": { "textDensity": "medium" },',
     '  "provenance": {',
     '    "recordingId": "rec-0001",',
     '    "sourceTimestampMs": 128400,',
@@ -412,6 +414,14 @@ export function buildReadme(manifest: ExportManifest): string {
     '  }',
     '}',
     '```',
+    '',
+    '## Item roles (schema 1.1)',
+    '',
+    'Each item carries one `role`: `post` (a top-level post as the main subject of the frame),',
+    '`reply` (a comment or reply to something), `quoted-card` (a quoted/embedded/shared post or',
+    'link card inside another item) or `feed-preview` (a feed/list/home-page row showing only a',
+    'title and author, e.g. Reddit home feed or YouTube listings, with no full body). The CSV',
+    '`role` column is the role of the first (primary) item.',
     '',
     '`hasMedia` and `hasAuthor` are UGC item-level properties, never frame-level: a frame',
     'may hold an image post and a text-only reply, and both values legitimately appear.',

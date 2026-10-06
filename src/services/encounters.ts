@@ -46,7 +46,6 @@ export function createEncounterForFrame(
     items: [item],
     status: 'pending',
     metadata: {
-      ugcType: 'original-post',
       textDensity: 'medium',
       visualDensity: 'medium',
       isFlaggedForReview: false,

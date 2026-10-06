@@ -3,7 +3,8 @@ import {
   EncounterSample,
   Platform,
   DatasetInfo,
-  UGCType,
+  GroundTruthItemRole,
+  normalizeRole,
   DensityLevel,
 } from '../types/schema';
 
@@ -43,7 +44,7 @@ class MockSlice2Session {
     search?: string;
     platform?: 'all' | Platform;
     status?: 'all' | string;
-    ugcType?: 'all' | UGCType;
+    role?: 'all' | GroundTruthItemRole;
     flaggedOnly?: boolean;
   }) {
     let result = [...this.encounters];
@@ -58,8 +59,8 @@ class MockSlice2Session {
       result = result.filter((e) => e.platform === params.platform);
     }
 
-    if (params.ugcType && params.ugcType !== 'all') {
-      result = result.filter((e) => e.metadata?.ugcType === params.ugcType);
+    if (params.role && params.role !== 'all') {
+      result = result.filter((e) => normalizeRole(e.items[0]?.role) === params.role);
     }
 
     if (params.search && params.search.trim().length > 0) {
@@ -134,7 +135,6 @@ class MockSlice2Session {
   public updateMetadata(
     sampleId: string,
     metadata: {
-      ugcType?: UGCType;
       textDensity?: DensityLevel;
       visualDensity?: DensityLevel;
       isFlaggedForReview?: boolean;
@@ -181,14 +181,12 @@ console.assert(info.targetMax === 200);
 
   // Test 2: Structured Metadata & Review Flags
   session.updateMetadata('ugc-000002', {
-    ugcType: 'comment',
     textDensity: 'high',
     visualDensity: 'low',
     isFlaggedForReview: true,
   });
 
   const sample2 = session.getEncounters().find((e) => e.sampleId === 'ugc-000002');
-  console.assert(sample2?.metadata?.ugcType === 'comment');
   console.assert(sample2?.metadata?.textDensity === 'high');
   console.assert(sample2?.metadata?.isFlaggedForReview === true);
   console.log('  ✓ Test 2 Passed: Structured UGC metadata & review flags persisted');
@@ -211,9 +209,12 @@ console.assert(info.targetMax === 200);
   const flaggedOnly = session.filterEncounters({ status: 'flagged' });
   console.assert(flaggedOnly.length === 1 && flaggedOnly[0].sampleId === 'ugc-000002');
 
-  const commentsOnly = session.filterEncounters({ ugcType: 'comment' });
-  console.assert(commentsOnly.length === 1 && commentsOnly[0].sampleId === 'ugc-000002');
-  console.log('  ✓ Test 4 Passed: Platform, Flag, and UGC Type filtering verified');
+  // Legacy stored role 'comment' must filter as the new 'reply' (read-time normalisation).
+  const legacySample = session.getEncounters().find((e) => e.sampleId === 'ugc-000002');
+  if (legacySample) legacySample.items[0].role = 'comment' as unknown as GroundTruthItemRole;
+  const repliesOnly = session.filterEncounters({ role: 'reply' });
+  console.assert(repliesOnly.length === 1 && repliesOnly[0].sampleId === 'ugc-000002');
+  console.log('  ✓ Test 4 Passed: Platform, Flag, and primary-item role filtering verified');
 
   // Test 5: Platform Distribution & Target Progress Stats
   const stats = session.getStats();

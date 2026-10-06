@@ -36,14 +36,14 @@ export function App() {
     searchQuery,
     statusFilter,
     platformFilter,
-    ugcTypeFilter,
+    roleFilter,
     sortOption,
     dedupFilter,
     hideSuppressedDuplicates,
     setSearchQuery,
     setStatusFilter,
     setPlatformFilter,
-    setUgcTypeFilter,
+    setRoleFilter,
     setSortOption,
     setDedupFilter,
     setHideSuppressedDuplicates,
@@ -475,7 +475,7 @@ export function App() {
             searchQuery={searchQuery}
             statusFilter={statusFilter}
             platformFilter={platformFilter}
-            ugcTypeFilter={ugcTypeFilter}
+            roleFilter={roleFilter}
             sortOption={sortOption}
             dedupFilter={dedupFilter}
             hideSuppressedDuplicates={hideSuppressedDuplicates}
@@ -486,7 +486,7 @@ export function App() {
             onSearchChange={setSearchQuery}
             onStatusFilterChange={setStatusFilter}
             onPlatformFilterChange={setPlatformFilter}
-            onUgcTypeFilterChange={setUgcTypeFilter}
+            onRoleFilterChange={setRoleFilter}
             onSortChange={setSortOption}
             onDedupFilterChange={setDedupFilter}
             onHideSuppressedChange={setHideSuppressedDuplicates}

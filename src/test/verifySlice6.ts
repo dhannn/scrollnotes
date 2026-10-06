@@ -221,7 +221,6 @@ function runSlice6Verification() {
   // ---------------------------------------------------------------------
   const flagged = makeAnnotated(6, {
     metadata: {
-      ugcType: 'original-post',
       textDensity: 'high',
       visualDensity: 'low',
       qualityFlags: ['ui-heavy', 'ambiguous-author'],

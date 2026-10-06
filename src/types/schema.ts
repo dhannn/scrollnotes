@@ -24,6 +24,7 @@ export type DatasetLifecycleStatus =
   | 'ready'
   | 'exported';
 
+/** @deprecated Legacy frame-level taxonomy. Kept only so old stored records still load; never written. */
 export type UGCType =
   | 'original-post'
   | 'comment'
@@ -36,13 +37,59 @@ export type UGCType =
 
 export type DensityLevel = 'low' | 'medium' | 'high';
 
-export type GroundTruthItemRole =
-  | 'post'
-  | 'comment'
-  | 'reply'
-  | 'quoted-post'
-  | 'card'
-  | 'standalone';
+/**
+ * Item-level role taxonomy (schema 1.1).
+ * - post: a top-level post as the main subject of the frame
+ * - reply: a comment or reply to something
+ * - quoted-card: a quoted/embedded/shared post or link card inside another item
+ * - feed-preview: a feed/list/home-page row showing only a title and author, no full body
+ */
+export type GroundTruthItemRole = 'post' | 'reply' | 'quoted-card' | 'feed-preview';
+
+export const GROUND_TRUTH_ITEM_ROLES: readonly GroundTruthItemRole[] = [
+  'post',
+  'reply',
+  'quoted-card',
+  'feed-preview',
+];
+
+export const ITEM_ROLE_LABELS: Record<GroundTruthItemRole, string> = {
+  post: 'Post (top-level post)',
+  reply: 'Reply',
+  'quoted-card': 'Quoted card',
+  'feed-preview': 'Feed preview',
+};
+
+export const ITEM_ROLE_DEFINITIONS: Record<GroundTruthItemRole, string> = {
+  post: 'A top-level post as the main subject of the frame.',
+  reply: 'A comment or reply to something.',
+  'quoted-card': 'A quoted/embedded/shared post or link card inside another item.',
+  'feed-preview':
+    'A feed/list/home-page row showing only a title and author (e.g. Reddit home feed, YouTube listings) with no full body.',
+};
+
+/**
+ * Pure read-time normaliser for stored/legacy role values. Never written back to storage.
+ * Unknown values fall back to 'post'.
+ */
+export function normalizeRole(role: string | undefined | null): GroundTruthItemRole {
+  switch (role) {
+    case 'post':
+    case 'card':
+    case 'standalone':
+      return 'post';
+    case 'reply':
+    case 'comment':
+      return 'reply';
+    case 'quoted-post':
+    case 'quoted-card':
+      return 'quoted-card';
+    case 'feed-preview':
+      return 'feed-preview';
+    default:
+      return 'post';
+  }
+}
 
 export interface GroundTruthItem {
   id: string;
@@ -56,11 +103,13 @@ export interface GroundTruthItem {
 }
 
 export interface SampleContext {
+  /** @deprecated Legacy; never written. */
   type?: UGCType;
   threadDepth?: number;
 }
 
 export interface SampleMetadata {
+  /** @deprecated Legacy; never written. Use items[0].role. */
   ugcType?: UGCType;
   textDensity?: DensityLevel;
   visualDensity?: DensityLevel;
@@ -381,7 +430,7 @@ export const DEFAULT_SAMPLING_CONFIG: SamplingConfig = {
 // ============================================================================
 
 /** Version of the on-disk export schema. Bumped when a field changes meaning. */
-export const SCHEMA_VERSION = '1.0';
+export const SCHEMA_VERSION = '1.1';
 
 export const EXPORT_FILES = {
   annotations: 'annotations.jsonl',

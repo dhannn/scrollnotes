@@ -6,7 +6,8 @@ import {
   Platform,
   EncounterStatus,
   DatasetInfo,
-  UGCType,
+  GroundTruthItemRole,
+  normalizeRole,
   SampleMetadata,
   GroundTruthItem,
   OcrArtifact,
@@ -117,7 +118,7 @@ export function useFieldSession() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<StatusFilterOption>('all');
   const [platformFilter, setPlatformFilter] = useState<'all' | Platform>('all');
-  const [ugcTypeFilter, setUgcTypeFilter] = useState<'all' | UGCType>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | GroundTruthItemRole>('all');
   const [sortOption, setSortOption] = useState<SortOption>('default');
   const [dedupFilter, setDedupFilter] = useState<DedupFilterOption>('all');
   const [hideSuppressedDuplicates, setHideSuppressedDuplicates] = useState<boolean>(false);
@@ -394,9 +395,9 @@ export function useFieldSession() {
       result = result.filter((e) => e.platform === platformFilter);
     }
 
-    // UGC Type filter
-    if (ugcTypeFilter !== 'all') {
-      result = result.filter((e) => e.metadata?.ugcType === ugcTypeFilter);
+    // Primary-item role filter (legacy roles normalised at read time)
+    if (roleFilter !== 'all') {
+      result = result.filter((e) => normalizeRole(e.items?.[0]?.role) === roleFilter);
     }
 
     // Deduplication filters (Slice 4) — reversible; suppressed frames stay recoverable
@@ -451,7 +452,7 @@ export function useFieldSession() {
     encounters,
     statusFilter,
     platformFilter,
-    ugcTypeFilter,
+    roleFilter,
     searchQuery,
     sortOption,
     dedupRecords,
@@ -1403,14 +1404,14 @@ export function useFieldSession() {
     searchQuery,
     statusFilter,
     platformFilter,
-    ugcTypeFilter,
+    roleFilter,
     sortOption,
     dedupFilter,
     hideSuppressedDuplicates,
     setSearchQuery,
     setStatusFilter,
     setPlatformFilter,
-    setUgcTypeFilter,
+    setRoleFilter,
     setSortOption,
     setDedupFilter,
     setHideSuppressedDuplicates,

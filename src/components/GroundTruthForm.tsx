@@ -15,6 +15,12 @@ import { OCRPanel, previewSnippet } from './OCRPanel';
 import { QualityFlagPicker } from './QualityFlagPicker';
 import { toggleQualityFlag } from '../services/qualityFlags';
 import type { QualityFlag } from '../types/schema';
+import {
+  GROUND_TRUTH_ITEM_ROLES,
+  ITEM_ROLE_DEFINITIONS,
+  ITEM_ROLE_LABELS,
+  normalizeRole,
+} from '../types/schema';
 import { applyOcrInsert } from '../services/ocrInsert';
 import {
   CheckCircle,
@@ -68,14 +74,10 @@ const PLATFORMS: { id: Platform; label: string }[] = [
   { id: 'other', label: 'Other' },
 ];
 
-const ITEM_ROLES: { id: GroundTruthItemRole; label: string }[] = [
-  { id: 'post', label: 'Post / Top Post' },
-  { id: 'reply', label: 'Thread Reply' },
-  { id: 'comment', label: 'Comment' },
-  { id: 'quoted-post', label: 'Quoted Card' },
-  { id: 'card', label: 'Feed Card' },
-  { id: 'standalone', label: 'Standalone' },
-];
+const ITEM_ROLES: { id: GroundTruthItemRole; label: string }[] = GROUND_TRUTH_ITEM_ROLES.map((id) => ({
+  id,
+  label: ITEM_ROLE_LABELS[id],
+}));
 
 const DENSITIES: DensityLevel[] = ['low', 'medium', 'high'];
 
@@ -394,7 +396,7 @@ export const GroundTruthForm: React.FC<GroundTruthFormProps> = ({
                   <span className="ugc-item-index-badge">#{index + 1}</span>
                   <select
                     className="form-input ugc-role-select"
-                    value={item.role || 'post'}
+                    value={normalizeRole(item.role)}
                     onChange={(e) =>
                       updateItemField(index, 'role', e.target.value as GroundTruthItemRole)
                     }
@@ -405,6 +407,9 @@ export const GroundTruthForm: React.FC<GroundTruthFormProps> = ({
                       </option>
                     ))}
                   </select>
+                  <span className="form-helper" style={{ fontSize: '0.68rem' }}>
+                    {ITEM_ROLE_DEFINITIONS[normalizeRole(item.role)]}
+                  </span>
                 </div>
 
                 {/* UGC Item-Level Attribute Chips (hasMedia, hasAuthor) */}
@@ -483,6 +488,11 @@ export const GroundTruthForm: React.FC<GroundTruthFormProps> = ({
               )}
 
               {/* Item Verbatim Content */}
+              {platform === 'reddit' && (
+                <div className="form-helper" style={{ fontSize: '0.7rem', marginTop: '0.5rem' }}>
+                  Reddit: content = post title, then the visible body text, separated by a line break.
+                </div>
+              )}
               <div className="form-group" style={{ marginTop: '0.5rem' }}>
                 <div className="form-label-row">
                   <label className="form-label" style={{ fontSize: '0.75rem' }}>

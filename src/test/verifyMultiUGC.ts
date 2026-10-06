@@ -103,7 +103,7 @@ function runMultiUGCVerification() {
   // Test 3: Adding 3rd Item in Frame (e.g. 3-tweet timeline)
   session.addItem('ugc-000001', {
     id: 'item-ugc-000001-3',
-    role: 'comment',
+    role: 'reply',
     orderIndex: 2,
     content: 'Third visible comment at the bottom of the screenshot.',
     author: '@community_eval',
